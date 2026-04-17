@@ -37,13 +37,20 @@ ControllerCuratedRadio.prototype.onStart = function() {
   this.addToBrowseSources();
   this._scheduleRefreshTimer();
 
-  return this.syncDatabase(false)
-    .then(() => {
-      if (this._isEnabled() && this._configBool('refreshOnStartup', true)) {
-        return this._runMaintenanceCycle(false);
-      }
-      return libQ.resolve();
-    });
+  setTimeout(() => {
+    this.syncDatabase(false)
+      .then(() => {
+        if (this._isEnabled() && this._configBool('refreshOnStartup', true)) {
+          return this._runMaintenanceCycle(false);
+        }
+        return libQ.resolve();
+      })
+      .fail((err) => {
+        this.logger.error('[curated_radio] startup sync failed: ' + (err && err.message ? err.message : err));
+      });
+  }, 0);
+
+  return libQ.resolve();
 };
 
 ControllerCuratedRadio.prototype.onStop = function() {

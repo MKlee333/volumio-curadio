@@ -1,0 +1,20 @@
+{
+  "enabled": true,
+  "pythonCommand": "python3",
+  "databasePath": "/data/INTERNAL/curated-radio.db",
+  "seedJsonPath": "/data/favourites/my-web-radio",
+  "findingsJsonPath": "/data/INTERNAL/curated-radio-findings.json",
+  "autoRefresh": true,
+  "autoDiscover": true,
+  "refreshIntervalMinutes": 360,
+  "discoveryApiBase": "https://de1.api.radio-browser.info",
+  "discoveryLimit": 80,
+  "discoveryProfilePrompt": "prefer: community radio, underground, eclectic, freeform, resident djs, mixes, archives, cultural talk, local scenes; avoid: mainstream, hits, christmas, xmas, chart, commercial, easy listening; sources: radio browser, station homepage",
+  "editorialSourceUrls": "",
+  "curatedTagSeeds": "underground,eclectic,electronic,experimental,leftfield,ambient,downtempo,house,techno,dub,dubstep,jungle,garage,lofi,hip hop,jazz,soul,reggae,community",
+  "blockedTagPatterns": "christmas,xmas,pop,hits,charts,top 40,oldies,schlager,country,religious,talk,news,sports",
+  "blockedNamePatterns": "radio paradise,mango,christmas,xmas",
+  "refreshOnStartup": true,
+  "maxStationsPerSection": 250,
+  "lastSyncSummary": "Not synced yet"
+}

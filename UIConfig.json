@@ -1,0 +1,187 @@
+{
+  "page": {
+    "label": "TRANSLATE.CURATED_RADIO"
+  },
+  "sections": [
+    {
+      "id": "general",
+      "element": "section",
+      "label": "TRANSLATE.GENERAL",
+      "icon": "fa-globe",
+      "onSave": {
+        "type": "controller",
+        "endpoint": "music_service/curated_radio",
+        "method": "saveBasicConfig"
+      },
+      "saveButton": {
+        "label": "TRANSLATE.SAVE",
+        "data": [
+          "enabled",
+          "databasePath",
+          "seedJsonPath",
+          "findingsJsonPath",
+          "autoRefresh",
+          "autoDiscover",
+          "refreshIntervalMinutes",
+          "discoveryApiBase",
+          "discoveryLimit",
+          "discoveryProfilePrompt",
+          "editorialSourceUrls",
+          "curatedTagSeeds",
+          "blockedTagPatterns",
+          "blockedNamePatterns"
+        ]
+      },
+      "content": [
+        {
+          "id": "enabled",
+          "element": "switch",
+          "label": "TRANSLATE.ENABLED",
+          "value": true
+        },
+        {
+          "id": "databasePath",
+          "element": "text",
+          "label": "TRANSLATE.DATABASE_PATH",
+          "value": ""
+        },
+        {
+          "id": "seedJsonPath",
+          "element": "text",
+          "label": "TRANSLATE.SEED_JSON_PATH",
+          "value": ""
+        },
+        {
+          "id": "findingsJsonPath",
+          "element": "text",
+          "label": "TRANSLATE.FINDINGS_JSON_PATH",
+          "value": ""
+        },
+        {
+          "id": "autoRefresh",
+          "element": "switch",
+          "label": "TRANSLATE.AUTO_REFRESH",
+          "value": true
+        },
+        {
+          "id": "autoDiscover",
+          "element": "switch",
+          "label": "TRANSLATE.AUTO_DISCOVER",
+          "value": true
+        },
+        {
+          "id": "refreshIntervalMinutes",
+          "element": "text",
+          "label": "TRANSLATE.REFRESH_INTERVAL_MINUTES",
+          "value": "360"
+        },
+        {
+          "id": "discoveryApiBase",
+          "element": "text",
+          "label": "TRANSLATE.DISCOVERY_API_BASE",
+          "value": ""
+        },
+        {
+          "id": "discoveryLimit",
+          "element": "text",
+          "label": "TRANSLATE.DISCOVERY_LIMIT",
+          "value": "80"
+        },
+        {
+          "id": "discoveryProfilePrompt",
+          "element": "text",
+          "label": "TRANSLATE.DISCOVERY_PROFILE_PROMPT",
+          "value": ""
+        },
+        {
+          "id": "editorialSourceUrls",
+          "element": "text",
+          "label": "TRANSLATE.EDITORIAL_SOURCE_URLS",
+          "value": ""
+        },
+        {
+          "id": "curatedTagSeeds",
+          "element": "text",
+          "label": "TRANSLATE.CURATED_TAG_SEEDS",
+          "value": ""
+        },
+        {
+          "id": "blockedTagPatterns",
+          "element": "text",
+          "label": "TRANSLATE.BLOCKED_TAG_PATTERNS",
+          "value": ""
+        },
+        {
+          "id": "blockedNamePatterns",
+          "element": "text",
+          "label": "TRANSLATE.BLOCKED_NAME_PATTERNS",
+          "value": ""
+        }
+      ]
+    },
+    {
+      "id": "actions",
+      "element": "section",
+      "label": "TRANSLATE.ACTIONS",
+      "icon": "fa-bolt",
+      "content": [
+        {
+          "id": "lastSyncSummary",
+          "element": "text",
+          "label": "TRANSLATE.LAST_SYNC_SUMMARY",
+          "value": ""
+        },
+        {
+          "id": "runSync",
+          "element": "button",
+          "label": "TRANSLATE.RUN_SYNC_NOW",
+          "onClick": {
+            "type": "controller",
+            "endpoint": "music_service/curated_radio",
+            "method": "runSyncNow"
+          }
+        },
+        {
+          "id": "runRefresh",
+          "element": "button",
+          "label": "TRANSLATE.RUN_REFRESH_NOW",
+          "onClick": {
+            "type": "controller",
+            "endpoint": "music_service/curated_radio",
+            "method": "runRefreshNow"
+          }
+        },
+        {
+          "id": "runDiscover",
+          "element": "button",
+          "label": "TRANSLATE.RUN_DISCOVER_NOW",
+          "onClick": {
+            "type": "controller",
+            "endpoint": "music_service/curated_radio",
+            "method": "runDiscoverNow"
+          }
+        },
+        {
+          "id": "saveCurrentInteresting",
+          "element": "button",
+          "label": "TRANSLATE.SAVE_CURRENT_INTERESTING",
+          "onClick": {
+            "type": "controller",
+            "endpoint": "music_service/curated_radio",
+            "method": "saveCurrentInteresting"
+          }
+        },
+        {
+          "id": "removeCurrentInteresting",
+          "element": "button",
+          "label": "TRANSLATE.REMOVE_CURRENT_INTERESTING",
+          "onClick": {
+            "type": "controller",
+            "endpoint": "music_service/curated_radio",
+            "method": "removeCurrentInteresting"
+          }
+        }
+      ]
+    }
+  ]
+}

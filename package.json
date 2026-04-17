@@ -1,0 +1,42 @@
+{
+  "name": "curated_radio",
+  "version": "0.4.0",
+  "description": "Separate Volumio browse source for curated, verified, and discovered web radio streams",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"No automated tests\" && exit 0"
+  },
+  "author": "MKlee333 and contributors",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MKlee333/volumio-curadio.git"
+  },
+  "volumio_info": {
+    "prettyName": "Curated Radio",
+    "icon": "fa-globe",
+    "plugin_type": "music_service",
+    "architectures": [
+      "arm",
+      "armv7",
+      "armv8",
+      "x86_amd64"
+    ],
+    "os": [
+      "buster",
+      "bullseye",
+      "bookworm"
+    ],
+    "details": "Adds a separate Browse source with verified streams, discovered findings, review queues, inactive stations, and grouped radio views backed by a local SQLite database.",
+    "changelog": "0.4.0 Prefer highest-bitrate stream variants, show quality labels, and add saved Interesting Stations.",
+    "version": "0.4.0"
+  },
+  "engines": {
+    "node": ">=8",
+    "volumio": ">=3"
+  },
+  "dependencies": {
+    "kew": "^0.7.0",
+    "v-conf": "^1.4.2"
+  }
+}

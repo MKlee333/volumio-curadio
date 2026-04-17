@@ -822,6 +822,26 @@ ControllerCuratedRadio.prototype._defaultConfigValues = function() {
   };
 };
 
+ControllerCuratedRadio.prototype._normalizeConfigType = function(typeHint, value) {
+  const typeToken = String(typeHint || '').trim().toLowerCase();
+  if (typeToken === 'boolean') {
+    return 'boolean';
+  }
+  if (typeToken === 'number' || typeToken === 'integer' || typeToken === 'float') {
+    return 'number';
+  }
+  if (typeToken === 'string') {
+    return 'string';
+  }
+  if (typeof value === 'boolean') {
+    return 'boolean';
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return 'number';
+  }
+  return 'string';
+};
+
 ControllerCuratedRadio.prototype._normalizeConfigSchema = function() {
   let raw = {};
   try {
@@ -831,24 +851,60 @@ ControllerCuratedRadio.prototype._normalizeConfigSchema = function() {
   }
 
   const defaults = this._defaultConfigValues();
-  let migrated = false;
+  const normalized = {};
+  let needsRewrite = false;
+
   Object.keys(defaults).forEach((key) => {
-    const current = this.config.get(key);
-    if (typeof current !== 'undefined') {
+    const defaultValue = defaults[key];
+    const fallbackType = this._normalizeConfigType(null, defaultValue);
+    const rawEntry = raw && Object.prototype.hasOwnProperty.call(raw, key) ? raw[key] : undefined;
+
+    if (rawEntry && typeof rawEntry === 'object' && Object.prototype.hasOwnProperty.call(rawEntry, 'value')) {
+      const normalizedType = this._normalizeConfigType(rawEntry.type, rawEntry.value);
+      normalized[key] = {
+        type: normalizedType,
+        value: rawEntry.value
+      };
+      if (rawEntry.type !== normalizedType) {
+        needsRewrite = true;
+      }
       return;
     }
-    let rawValue;
-    if (raw && Object.prototype.hasOwnProperty.call(raw, key)) {
-      rawValue = this._unwrapInputValue(raw[key]);
-    }
-    if (typeof rawValue === 'undefined') {
-      rawValue = defaults[key];
-    }
-    this.config.set(key, rawValue);
-    migrated = true;
+
+    const normalizedValue = typeof rawEntry === 'undefined' ? defaultValue : this._unwrapInputValue(rawEntry);
+    normalized[key] = {
+      type: fallbackType,
+      value: normalizedValue
+    };
+    needsRewrite = true;
   });
 
-  if (migrated) {
+  Object.keys(raw || {}).forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(normalized, key)) {
+      return;
+    }
+    const rawEntry = raw[key];
+    if (rawEntry && typeof rawEntry === 'object' && Object.prototype.hasOwnProperty.call(rawEntry, 'value')) {
+      const normalizedType = this._normalizeConfigType(rawEntry.type, rawEntry.value);
+      normalized[key] = {
+        type: normalizedType,
+        value: rawEntry.value
+      };
+      if (rawEntry.type !== normalizedType) {
+        needsRewrite = true;
+      }
+      return;
+    }
+    normalized[key] = {
+      type: this._normalizeConfigType(null, rawEntry),
+      value: this._unwrapInputValue(rawEntry)
+    };
+    needsRewrite = true;
+  });
+
+  if (needsRewrite) {
+    fs.writeFileSync(this.configFile, JSON.stringify(normalized, null, 2), 'utf8');
+    this.config.loadFile(this.configFile);
     this.logger.info('[curated_radio] normalized config schema to v-conf typed values');
   }
 };

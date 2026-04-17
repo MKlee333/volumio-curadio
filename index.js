@@ -20,8 +20,10 @@ function ControllerCuratedRadio(context) {
 
 ControllerCuratedRadio.prototype.onVolumioStart = function() {
   const configFile = this.commandRouter.pluginManager.getConfigurationFile(this.context, 'config.json');
+  this.configFile = configFile;
   this.config = new (require('v-conf'))();
   this.config.loadFile(configFile);
+  this._normalizeConfigSchema();
   return libQ.resolve();
 };
 
@@ -37,7 +39,7 @@ ControllerCuratedRadio.prototype.onStart = function() {
 
   return this.syncDatabase(false)
     .then(() => {
-      if (this._isEnabled() && this.config.get('refreshOnStartup')) {
+      if (this._isEnabled() && this._configBool('refreshOnStartup', true)) {
         return this._runMaintenanceCycle(false);
       }
       return libQ.resolve();
@@ -66,29 +68,29 @@ ControllerCuratedRadio.prototype.getUIConfig = function() {
     path.join(__dirname, 'i18n', 'strings_en.json'),
     path.join(__dirname, 'UIConfig.json')
   ).then((uiconf) => {
-    this._setUIValue(uiconf, 'enabled', !!this.config.get('enabled'));
-    this._setUIValue(uiconf, 'databasePath', this.config.get('databasePath'));
-    this._setUIValue(uiconf, 'seedJsonPath', this.config.get('seedJsonPath'));
-    this._setUIValue(uiconf, 'findingsJsonPath', this.config.get('findingsJsonPath'));
-    this._setUIValue(uiconf, 'autoRefresh', !!this.config.get('autoRefresh'));
-    this._setUIValue(uiconf, 'autoDiscover', !!this.config.get('autoDiscover'));
-    this._setUIValue(uiconf, 'refreshIntervalMinutes', String(this.config.get('refreshIntervalMinutes') || 360));
-    this._setUIValue(uiconf, 'discoveryApiBase', this.config.get('discoveryApiBase') || 'https://de1.api.radio-browser.info');
-    this._setUIValue(uiconf, 'discoveryLimit', String(this.config.get('discoveryLimit') || 80));
-    this._setUIValue(uiconf, 'discoveryProfilePrompt', this.config.get('discoveryProfilePrompt') || '');
-    this._setUIValue(uiconf, 'editorialSourceUrls', this.config.get('editorialSourceUrls') || '');
-    this._setUIValue(uiconf, 'curatedTagSeeds', this.config.get('curatedTagSeeds') || '');
-    this._setUIValue(uiconf, 'blockedTagPatterns', this.config.get('blockedTagPatterns') || '');
-    this._setUIValue(uiconf, 'blockedNamePatterns', this.config.get('blockedNamePatterns') || '');
-    this._setUIValue(uiconf, 'discoveryCloudTermLimit', String(this.config.get('discoveryCloudTermLimit') || 40));
-    this._setUIValue(uiconf, 'discoveryAiEnabled', !!this.config.get('discoveryAiEnabled'));
-    this._setUIValue(uiconf, 'discoveryAiApiBase', this.config.get('discoveryAiApiBase') || 'https://api.openai.com/v1');
-    this._setUIValue(uiconf, 'discoveryAiModel', this.config.get('discoveryAiModel') || 'gpt-4o-mini');
-    this._setUIValue(uiconf, 'discoveryAiApiKey', this.config.get('discoveryAiApiKey') || '');
-    this._setUIValue(uiconf, 'discoveryAiTermLimit', String(this.config.get('discoveryAiTermLimit') || 12));
-    this._setUIValue(uiconf, 'lastSyncSummary', this.config.get('lastSyncSummary') || '');
-    this._setUIValue(uiconf, 'lastCrawledAt', this._formatUiTimestamp(this.config.get('lastCrawledAt')));
-    this._setUIValue(uiconf, 'lastCheckedAt', this._formatUiTimestamp(this.config.get('lastCheckedAt')));
+    this._setUIValue(uiconf, 'enabled', this._configBool('enabled', true));
+    this._setUIValue(uiconf, 'databasePath', this._configText('databasePath', '/data/INTERNAL/curated-radio.db'));
+    this._setUIValue(uiconf, 'seedJsonPath', this._configText('seedJsonPath', '/data/favourites/my-web-radio'));
+    this._setUIValue(uiconf, 'findingsJsonPath', this._configText('findingsJsonPath', '/data/INTERNAL/curated-radio-findings.json'));
+    this._setUIValue(uiconf, 'autoRefresh', this._configBool('autoRefresh', true));
+    this._setUIValue(uiconf, 'autoDiscover', this._configBool('autoDiscover', true));
+    this._setUIValue(uiconf, 'refreshIntervalMinutes', String(this._configInt('refreshIntervalMinutes', 360)));
+    this._setUIValue(uiconf, 'discoveryApiBase', this._configText('discoveryApiBase', 'https://de1.api.radio-browser.info'));
+    this._setUIValue(uiconf, 'discoveryLimit', String(this._configInt('discoveryLimit', 80)));
+    this._setUIValue(uiconf, 'discoveryProfilePrompt', this._configText('discoveryProfilePrompt', ''));
+    this._setUIValue(uiconf, 'editorialSourceUrls', this._configText('editorialSourceUrls', ''));
+    this._setUIValue(uiconf, 'curatedTagSeeds', this._configText('curatedTagSeeds', ''));
+    this._setUIValue(uiconf, 'blockedTagPatterns', this._configText('blockedTagPatterns', ''));
+    this._setUIValue(uiconf, 'blockedNamePatterns', this._configText('blockedNamePatterns', ''));
+    this._setUIValue(uiconf, 'discoveryCloudTermLimit', String(this._configInt('discoveryCloudTermLimit', 40)));
+    this._setUIValue(uiconf, 'discoveryAiEnabled', this._configBool('discoveryAiEnabled', false));
+    this._setUIValue(uiconf, 'discoveryAiApiBase', this._configText('discoveryAiApiBase', 'https://api.openai.com/v1'));
+    this._setUIValue(uiconf, 'discoveryAiModel', this._configText('discoveryAiModel', 'gpt-4o-mini'));
+    this._setUIValue(uiconf, 'discoveryAiApiKey', this._configText('discoveryAiApiKey', ''));
+    this._setUIValue(uiconf, 'discoveryAiTermLimit', String(this._configInt('discoveryAiTermLimit', 12)));
+    this._setUIValue(uiconf, 'lastSyncSummary', this._configText('lastSyncSummary', ''));
+    this._setUIValue(uiconf, 'lastCrawledAt', this._formatUiTimestamp(this._configText('lastCrawledAt', '')));
+    this._setUIValue(uiconf, 'lastCheckedAt', this._formatUiTimestamp(this._configText('lastCheckedAt', '')));
     defer.resolve(uiconf);
   }).fail((err) => defer.reject(err));
 
@@ -96,25 +98,25 @@ ControllerCuratedRadio.prototype.getUIConfig = function() {
 };
 
 ControllerCuratedRadio.prototype.saveBasicConfig = function(data) {
-  this.config.set('enabled', !!data.enabled);
-  this.config.set('databasePath', String(data.databasePath || '').trim() || '/data/INTERNAL/curated-radio.db');
-  this.config.set('seedJsonPath', String(data.seedJsonPath || '').trim() || '/data/favourites/my-web-radio');
-  this.config.set('findingsJsonPath', String(data.findingsJsonPath || '').trim() || '/data/INTERNAL/curated-radio-findings.json');
-  this.config.set('autoRefresh', !!data.autoRefresh);
-  this.config.set('autoDiscover', !!data.autoDiscover);
+  this.config.set('enabled', this._boolInput(data.enabled, true));
+  this.config.set('databasePath', this._textInput(data.databasePath) || '/data/INTERNAL/curated-radio.db');
+  this.config.set('seedJsonPath', this._textInput(data.seedJsonPath) || '/data/favourites/my-web-radio');
+  this.config.set('findingsJsonPath', this._textInput(data.findingsJsonPath) || '/data/INTERNAL/curated-radio-findings.json');
+  this.config.set('autoRefresh', this._boolInput(data.autoRefresh, true));
+  this.config.set('autoDiscover', this._boolInput(data.autoDiscover, true));
   this.config.set('refreshIntervalMinutes', this._clampInt(data.refreshIntervalMinutes, 10, 10080, 360));
-  this.config.set('discoveryApiBase', String(data.discoveryApiBase || '').trim() || 'https://de1.api.radio-browser.info');
+  this.config.set('discoveryApiBase', this._textInput(data.discoveryApiBase) || 'https://de1.api.radio-browser.info');
   this.config.set('discoveryLimit', this._clampInt(data.discoveryLimit, 10, 500, 80));
-  this.config.set('discoveryProfilePrompt', String(data.discoveryProfilePrompt || '').trim() || 'prefer: community radio, underground, eclectic, freeform, resident djs, mixes, archives, cultural talk, local scenes; avoid: mainstream, hits, christmas, xmas, chart, commercial, easy listening; sources: radio browser, station homepage');
-  this.config.set('editorialSourceUrls', String(data.editorialSourceUrls || '').trim());
-  this.config.set('curatedTagSeeds', String(data.curatedTagSeeds || '').trim() || 'underground,eclectic,electronic,experimental,leftfield,ambient,downtempo,house,techno,dub,dubstep,jungle,garage,lofi,hip hop,jazz,soul,reggae,community');
-  this.config.set('blockedTagPatterns', String(data.blockedTagPatterns || '').trim() || 'christmas,xmas,pop,hits,charts,top 40,oldies,schlager,country,religious,talk,news,sports');
-  this.config.set('blockedNamePatterns', String(data.blockedNamePatterns || '').trim() || 'radio paradise,mango,christmas,xmas');
+  this.config.set('discoveryProfilePrompt', this._textInput(data.discoveryProfilePrompt) || 'prefer: community radio, underground, eclectic, freeform, resident djs, mixes, archives, cultural talk, local scenes; avoid: mainstream, hits, christmas, xmas, chart, commercial, easy listening; sources: radio browser, station homepage');
+  this.config.set('editorialSourceUrls', this._textInput(data.editorialSourceUrls));
+  this.config.set('curatedTagSeeds', this._textInput(data.curatedTagSeeds) || 'underground,eclectic,electronic,experimental,leftfield,ambient,downtempo,house,techno,dub,dubstep,jungle,garage,lofi,hip hop,jazz,soul,reggae,community');
+  this.config.set('blockedTagPatterns', this._textInput(data.blockedTagPatterns) || 'christmas,xmas,pop,hits,charts,top 40,oldies,schlager,country,religious,talk,news,sports');
+  this.config.set('blockedNamePatterns', this._textInput(data.blockedNamePatterns) || 'radio paradise,mango,christmas,xmas');
   this.config.set('discoveryCloudTermLimit', this._clampInt(data.discoveryCloudTermLimit, 10, 160, 40));
-  this.config.set('discoveryAiEnabled', !!data.discoveryAiEnabled);
-  this.config.set('discoveryAiApiBase', String(data.discoveryAiApiBase || '').trim() || 'https://api.openai.com/v1');
-  this.config.set('discoveryAiModel', String(data.discoveryAiModel || '').trim() || 'gpt-4o-mini');
-  this.config.set('discoveryAiApiKey', String(data.discoveryAiApiKey || '').trim());
+  this.config.set('discoveryAiEnabled', this._boolInput(data.discoveryAiEnabled, false));
+  this.config.set('discoveryAiApiBase', this._textInput(data.discoveryAiApiBase) || 'https://api.openai.com/v1');
+  this.config.set('discoveryAiModel', this._textInput(data.discoveryAiModel) || 'gpt-4o-mini');
+  this.config.set('discoveryAiApiKey', this._textInput(data.discoveryAiApiKey));
   this.config.set('discoveryAiTermLimit', this._clampInt(data.discoveryAiTermLimit, 0, 40, 12));
   this._scheduleRefreshTimer();
   this.commandRouter.pushToastMessage('success', this.getI18nString('PLUGIN_NAME'), this.getI18nString('SETTINGS_SAVED'));
@@ -432,7 +434,7 @@ ControllerCuratedRadio.prototype.discoverFindings = function(showToastOnError) {
     '--blocked-tags', this._getBlockedTagPatterns(),
     '--blocked-names', this._getBlockedNamePatterns(),
     '--cloud-term-limit', String(this._getDiscoveryCloudTermLimit()),
-    '--ai-enabled', this.config.get('discoveryAiEnabled') ? '1' : '0',
+    '--ai-enabled', this._configBool('discoveryAiEnabled', false) ? '1' : '0',
     '--ai-api-base', this._getDiscoveryAiApiBase(),
     '--ai-model', this._getDiscoveryAiModel(),
     '--ai-api-key', this._getDiscoveryAiApiKey(),
@@ -709,10 +711,10 @@ ControllerCuratedRadio.prototype._scheduleRefreshTimer = function() {
     clearInterval(this.refreshTimer);
     this.refreshTimer = null;
   }
-  if (!this._isEnabled() || (!this.config.get('autoRefresh') && !this.config.get('autoDiscover'))) {
+  if (!this._isEnabled() || (!this._configBool('autoRefresh', true) && !this._configBool('autoDiscover', true))) {
     return;
   }
-  const intervalMinutes = this._clampInt(this.config.get('refreshIntervalMinutes'), 10, 10080, 360);
+  const intervalMinutes = this._clampInt(this._configValue('refreshIntervalMinutes', 360), 10, 10080, 360);
   this.refreshTimer = setInterval(() => {
     this._runMaintenanceCycle(false).fail(() => libQ.resolve());
   }, intervalMinutes * 60 * 1000);
@@ -721,7 +723,7 @@ ControllerCuratedRadio.prototype._scheduleRefreshTimer = function() {
 ControllerCuratedRadio.prototype._runMaintenanceCycle = function(showToastOnError) {
   let sequence = libQ.resolve();
 
-  if (this.config.get('autoDiscover') && this._getFindingsJsonPath()) {
+  if (this._configBool('autoDiscover', true) && this._getFindingsJsonPath()) {
     sequence = sequence
       .then(() => this.discoverFindings(showToastOnError))
       .then(() => this.syncDatabase(false));
@@ -729,11 +731,126 @@ ControllerCuratedRadio.prototype._runMaintenanceCycle = function(showToastOnErro
     sequence = sequence.then(() => this.syncDatabase(false));
   }
 
-  if (this.config.get('autoRefresh')) {
+  if (this._configBool('autoRefresh', true)) {
     sequence = sequence.then(() => this.refreshDatabase(showToastOnError));
   }
 
   return sequence;
+};
+
+ControllerCuratedRadio.prototype._unwrapInputValue = function(value) {
+  if (value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, 'value')) {
+    return value.value;
+  }
+  return value;
+};
+
+ControllerCuratedRadio.prototype._textInput = function(value) {
+  const unwrapped = this._unwrapInputValue(value);
+  return String(unwrapped == null ? '' : unwrapped).trim();
+};
+
+ControllerCuratedRadio.prototype._boolInput = function(value, fallback) {
+  const unwrapped = this._unwrapInputValue(value);
+  if (typeof unwrapped === 'boolean') {
+    return unwrapped;
+  }
+  if (typeof unwrapped === 'number') {
+    return unwrapped !== 0;
+  }
+  if (typeof unwrapped === 'string') {
+    const token = unwrapped.trim().toLowerCase();
+    if (token === 'true' || token === '1' || token === 'yes' || token === 'on') {
+      return true;
+    }
+    if (token === 'false' || token === '0' || token === 'no' || token === 'off') {
+      return false;
+    }
+  }
+  return fallback;
+};
+
+ControllerCuratedRadio.prototype._configValue = function(key, fallback) {
+  const value = this._unwrapInputValue(this.config.get(key));
+  if (typeof value === 'undefined' || value === null) {
+    return fallback;
+  }
+  return value;
+};
+
+ControllerCuratedRadio.prototype._configText = function(key, fallback) {
+  const value = this._configValue(key, fallback);
+  return String(value == null ? '' : value);
+};
+
+ControllerCuratedRadio.prototype._configBool = function(key, fallback) {
+  return this._boolInput(this.config.get(key), fallback);
+};
+
+ControllerCuratedRadio.prototype._configInt = function(key, fallback) {
+  return this._clampInt(this.config.get(key), -2147483648, 2147483647, fallback);
+};
+
+ControllerCuratedRadio.prototype._defaultConfigValues = function() {
+  return {
+    enabled: true,
+    pythonCommand: 'python3',
+    databasePath: '/data/INTERNAL/curated-radio.db',
+    seedJsonPath: '/data/favourites/my-web-radio',
+    findingsJsonPath: '/data/INTERNAL/curated-radio-findings.json',
+    autoRefresh: true,
+    autoDiscover: true,
+    refreshIntervalMinutes: 360,
+    discoveryApiBase: 'https://de1.api.radio-browser.info',
+    discoveryLimit: 80,
+    discoveryProfilePrompt: 'prefer: community radio, underground, eclectic, freeform, resident djs, mixes, archives, cultural talk, local scenes; avoid: mainstream, hits, christmas, xmas, chart, commercial, easy listening; sources: radio browser, station homepage',
+    editorialSourceUrls: '',
+    curatedTagSeeds: 'underground,eclectic,electronic,experimental,leftfield,ambient,downtempo,house,techno,dub,dubstep,jungle,garage,lofi,hip hop,jazz,soul,reggae,community',
+    blockedTagPatterns: 'christmas,xmas,pop,hits,charts,top 40,oldies,schlager,country,religious,talk,news,sports',
+    blockedNamePatterns: 'radio paradise,mango,christmas,xmas',
+    discoveryCloudTermLimit: 40,
+    discoveryAiEnabled: false,
+    discoveryAiApiBase: 'https://api.openai.com/v1',
+    discoveryAiModel: 'gpt-4o-mini',
+    discoveryAiApiKey: '',
+    discoveryAiTermLimit: 12,
+    refreshOnStartup: true,
+    maxStationsPerSection: 250,
+    lastSyncSummary: 'Not synced yet',
+    lastCrawledAt: '',
+    lastCheckedAt: '',
+  };
+};
+
+ControllerCuratedRadio.prototype._normalizeConfigSchema = function() {
+  let raw = {};
+  try {
+    raw = JSON.parse(fs.readFileSync(this.configFile, 'utf8'));
+  } catch (e) {
+    raw = {};
+  }
+
+  const defaults = this._defaultConfigValues();
+  let migrated = false;
+  Object.keys(defaults).forEach((key) => {
+    const current = this.config.get(key);
+    if (typeof current !== 'undefined') {
+      return;
+    }
+    let rawValue;
+    if (raw && Object.prototype.hasOwnProperty.call(raw, key)) {
+      rawValue = this._unwrapInputValue(raw[key]);
+    }
+    if (typeof rawValue === 'undefined') {
+      rawValue = defaults[key];
+    }
+    this.config.set(key, rawValue);
+    migrated = true;
+  });
+
+  if (migrated) {
+    this.logger.info('[curated_radio] normalized config schema to v-conf typed values');
+  }
 };
 
 ControllerCuratedRadio.prototype._setUIValue = function(uiconf, id, value) {
@@ -764,7 +881,7 @@ ControllerCuratedRadio.prototype._formatUiTimestamp = function(value) {
 };
 
 ControllerCuratedRadio.prototype._clampInt = function(value, min, max, fallback) {
-  const parsed = parseInt(value, 10);
+  const parsed = parseInt(this._unwrapInputValue(value), 10);
   if (Number.isNaN(parsed)) {
     return fallback;
   }
@@ -778,73 +895,73 @@ ControllerCuratedRadio.prototype._clampInt = function(value, min, max, fallback)
 };
 
 ControllerCuratedRadio.prototype._isEnabled = function() {
-  return this.config.get('enabled') !== false;
+  return this._configBool('enabled', true);
 };
 
 ControllerCuratedRadio.prototype._getDatabasePath = function() {
-  return this.config.get('databasePath') || '/data/INTERNAL/curated-radio.db';
+  return this._configText('databasePath', '/data/INTERNAL/curated-radio.db');
 };
 
 ControllerCuratedRadio.prototype._getSeedJsonPath = function() {
-  return this.config.get('seedJsonPath') || '/data/favourites/my-web-radio';
+  return this._configText('seedJsonPath', '/data/favourites/my-web-radio');
 };
 
 ControllerCuratedRadio.prototype._getFindingsJsonPath = function() {
-  return this.config.get('findingsJsonPath') || '/data/INTERNAL/curated-radio-findings.json';
+  return this._configText('findingsJsonPath', '/data/INTERNAL/curated-radio-findings.json');
 };
 
 ControllerCuratedRadio.prototype._getMaxStationsPerSection = function() {
-  return this._clampInt(this.config.get('maxStationsPerSection'), 10, 1000, 250);
+  return this._clampInt(this._configValue('maxStationsPerSection', 250), 10, 1000, 250);
 };
 
 ControllerCuratedRadio.prototype._getPythonCommand = function() {
-  return this.config.get('pythonCommand') || 'python3';
+  return this._configText('pythonCommand', 'python3');
 };
 
 ControllerCuratedRadio.prototype._getDiscoveryApiBase = function() {
-  return this.config.get('discoveryApiBase') || 'https://de1.api.radio-browser.info';
+  return this._configText('discoveryApiBase', 'https://de1.api.radio-browser.info');
 };
 
 ControllerCuratedRadio.prototype._getDiscoveryLimit = function() {
-  return this._clampInt(this.config.get('discoveryLimit'), 10, 500, 80);
+  return this._clampInt(this._configValue('discoveryLimit', 80), 10, 500, 80);
 };
 
 ControllerCuratedRadio.prototype._getDiscoveryProfilePrompt = function() {
-  return this.config.get('discoveryProfilePrompt') || 'prefer: community radio, underground, eclectic, freeform, resident djs, mixes, archives, cultural talk, local scenes; avoid: mainstream, hits, christmas, xmas, chart, commercial, easy listening; sources: radio browser, station homepage';
+  return this._configText('discoveryProfilePrompt', 'prefer: community radio, underground, eclectic, freeform, resident djs, mixes, archives, cultural talk, local scenes; avoid: mainstream, hits, christmas, xmas, chart, commercial, easy listening; sources: radio browser, station homepage');
 };
 
 ControllerCuratedRadio.prototype._getEditorialSourceUrls = function() {
-  return this.config.get('editorialSourceUrls') || '';
+  return this._configText('editorialSourceUrls', '');
 };
 
 ControllerCuratedRadio.prototype._getCuratedTagSeeds = function() {
-  return this.config.get('curatedTagSeeds') || 'underground,eclectic,electronic,experimental,leftfield,ambient,downtempo,house,techno,dub,dubstep,jungle,garage,lofi,hip hop,jazz,soul,reggae,community';
+  return this._configText('curatedTagSeeds', 'underground,eclectic,electronic,experimental,leftfield,ambient,downtempo,house,techno,dub,dubstep,jungle,garage,lofi,hip hop,jazz,soul,reggae,community');
 };
 
 ControllerCuratedRadio.prototype._getBlockedTagPatterns = function() {
-  return this.config.get('blockedTagPatterns') || 'christmas,xmas,pop,hits,charts,top 40,oldies,schlager,country,religious,talk,news,sports';
+  return this._configText('blockedTagPatterns', 'christmas,xmas,pop,hits,charts,top 40,oldies,schlager,country,religious,talk,news,sports');
 };
 
 ControllerCuratedRadio.prototype._getBlockedNamePatterns = function() {
-  return this.config.get('blockedNamePatterns') || 'radio paradise,mango,christmas,xmas';
+  return this._configText('blockedNamePatterns', 'radio paradise,mango,christmas,xmas');
 };
 
 ControllerCuratedRadio.prototype._getDiscoveryCloudTermLimit = function() {
-  return this._clampInt(this.config.get('discoveryCloudTermLimit'), 10, 160, 40);
+  return this._clampInt(this._configValue('discoveryCloudTermLimit', 40), 10, 160, 40);
 };
 
 ControllerCuratedRadio.prototype._getDiscoveryAiApiBase = function() {
-  return this.config.get('discoveryAiApiBase') || 'https://api.openai.com/v1';
+  return this._configText('discoveryAiApiBase', 'https://api.openai.com/v1');
 };
 
 ControllerCuratedRadio.prototype._getDiscoveryAiModel = function() {
-  return this.config.get('discoveryAiModel') || 'gpt-4o-mini';
+  return this._configText('discoveryAiModel', 'gpt-4o-mini');
 };
 
 ControllerCuratedRadio.prototype._getDiscoveryAiApiKey = function() {
-  return this.config.get('discoveryAiApiKey') || process.env.OPENAI_API_KEY || '';
+  return this._configText('discoveryAiApiKey', '') || process.env.OPENAI_API_KEY || '';
 };
 
 ControllerCuratedRadio.prototype._getDiscoveryAiTermLimit = function() {
-  return this._clampInt(this.config.get('discoveryAiTermLimit'), 0, 40, 12);
+  return this._clampInt(this._configValue('discoveryAiTermLimit', 12), 0, 40, 12);
 };

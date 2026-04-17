@@ -1,28 +1,106 @@
 {
-  "enabled": true,
-  "pythonCommand": "python3",
-  "databasePath": "/data/INTERNAL/curated-radio.db",
-  "seedJsonPath": "/data/favourites/my-web-radio",
-  "findingsJsonPath": "/data/INTERNAL/curated-radio-findings.json",
-  "autoRefresh": true,
-  "autoDiscover": true,
-  "refreshIntervalMinutes": 360,
-  "discoveryApiBase": "https://de1.api.radio-browser.info",
-  "discoveryLimit": 80,
-  "discoveryProfilePrompt": "prefer: community radio, underground, eclectic, freeform, resident djs, mixes, archives, cultural talk, local scenes; avoid: mainstream, hits, christmas, xmas, chart, commercial, easy listening; sources: radio browser, station homepage",
-  "editorialSourceUrls": "",
-  "curatedTagSeeds": "underground,eclectic,electronic,experimental,leftfield,ambient,downtempo,house,techno,dub,dubstep,jungle,garage,lofi,hip hop,jazz,soul,reggae,community",
-  "blockedTagPatterns": "christmas,xmas,pop,hits,charts,top 40,oldies,schlager,country,religious,talk,news,sports",
-  "blockedNamePatterns": "radio paradise,mango,christmas,xmas",
-  "discoveryCloudTermLimit": 40,
-  "discoveryAiEnabled": false,
-  "discoveryAiApiBase": "https://api.openai.com/v1",
-  "discoveryAiModel": "gpt-4o-mini",
-  "discoveryAiApiKey": "",
-  "discoveryAiTermLimit": 12,
-  "refreshOnStartup": true,
-  "maxStationsPerSection": 250,
-  "lastSyncSummary": "Not synced yet",
-  "lastCrawledAt": "",
-  "lastCheckedAt": ""
+  "enabled": {
+    "type": "boolean",
+    "value": true
+  },
+  "pythonCommand": {
+    "type": "string",
+    "value": "python3"
+  },
+  "databasePath": {
+    "type": "string",
+    "value": "/data/INTERNAL/curated-radio.db"
+  },
+  "seedJsonPath": {
+    "type": "string",
+    "value": "/data/favourites/my-web-radio"
+  },
+  "findingsJsonPath": {
+    "type": "string",
+    "value": "/data/INTERNAL/curated-radio-findings.json"
+  },
+  "autoRefresh": {
+    "type": "boolean",
+    "value": true
+  },
+  "autoDiscover": {
+    "type": "boolean",
+    "value": true
+  },
+  "refreshIntervalMinutes": {
+    "type": "number",
+    "value": 360
+  },
+  "discoveryApiBase": {
+    "type": "string",
+    "value": "https://de1.api.radio-browser.info"
+  },
+  "discoveryLimit": {
+    "type": "number",
+    "value": 80
+  },
+  "discoveryProfilePrompt": {
+    "type": "string",
+    "value": "prefer: community radio, underground, eclectic, freeform, resident djs, mixes, archives, cultural talk, local scenes; avoid: mainstream, hits, christmas, xmas, chart, commercial, easy listening; sources: radio browser, station homepage"
+  },
+  "editorialSourceUrls": {
+    "type": "string",
+    "value": ""
+  },
+  "curatedTagSeeds": {
+    "type": "string",
+    "value": "underground,eclectic,electronic,experimental,leftfield,ambient,downtempo,house,techno,dub,dubstep,jungle,garage,lofi,hip hop,jazz,soul,reggae,community"
+  },
+  "blockedTagPatterns": {
+    "type": "string",
+    "value": "christmas,xmas,pop,hits,charts,top 40,oldies,schlager,country,religious,talk,news,sports"
+  },
+  "blockedNamePatterns": {
+    "type": "string",
+    "value": "radio paradise,mango,christmas,xmas"
+  },
+  "discoveryCloudTermLimit": {
+    "type": "number",
+    "value": 40
+  },
+  "discoveryAiEnabled": {
+    "type": "boolean",
+    "value": false
+  },
+  "discoveryAiApiBase": {
+    "type": "string",
+    "value": "https://api.openai.com/v1"
+  },
+  "discoveryAiModel": {
+    "type": "string",
+    "value": "gpt-4o-mini"
+  },
+  "discoveryAiApiKey": {
+    "type": "string",
+    "value": ""
+  },
+  "discoveryAiTermLimit": {
+    "type": "number",
+    "value": 12
+  },
+  "refreshOnStartup": {
+    "type": "boolean",
+    "value": true
+  },
+  "maxStationsPerSection": {
+    "type": "number",
+    "value": 250
+  },
+  "lastSyncSummary": {
+    "type": "string",
+    "value": "Not synced yet"
+  },
+  "lastCrawledAt": {
+    "type": "string",
+    "value": ""
+  },
+  "lastCheckedAt": {
+    "type": "string",
+    "value": ""
+  }
 }

@@ -666,15 +666,23 @@ def upsert_station(conn, station, source_name):
     new_name = station['name'] if len(station['name']) >= len(existing['name']) else existing['name']
     existing_bitrate = int_value(existing['bitrate'], 0)
     existing_codec = existing['codec'] or ''
-    existing_quality = stream_quality_key(existing_bitrate, existing_codec, existing['stream_url'])
-    incoming_quality = stream_quality_key(new_bitrate, new_codec, station['stream_url'])
     existing_normalized_url = normalize_url(existing['stream_url'])
     incoming_url_changed = station['normalized_url'] != existing_normalized_url
+    existing_is_inactive = int_value(existing['active'], 1) == 0 or existing['last_status'] == 'inactive'
     is_static_url = int_value(existing['is_static_url'], 0) == 1
     static_conflict = is_static_url and incoming_url_changed
+    protected_active_conflict = incoming_url_changed and (not existing_is_inactive) and (not is_static_url)
     if static_conflict:
         queue_url_change_review(conn, existing, station, source_name)
-    prefer_incoming_stream = not static_conflict and (station['normalized_url'] == existing['normalized_url'] or incoming_quality > existing_quality)
+    if station['normalized_url'] == existing['normalized_url']:
+        prefer_incoming_stream = True
+    elif static_conflict:
+        prefer_incoming_stream = False
+    elif existing_is_inactive:
+        # Only inactive stations are eligible for automatic URL replacement.
+        prefer_incoming_stream = True
+    else:
+        prefer_incoming_stream = False
     new_url = station['stream_url'] if prefer_incoming_stream else existing['stream_url']
     new_country = station['country'] or existing['country']
     new_genre = station['genre'] or existing['genre']
@@ -693,7 +701,7 @@ def upsert_station(conn, station, source_name):
     if prefer_incoming_stream and new_bitrate:
         merged_bitrate = new_bitrate
     merged_codec = new_codec if prefer_incoming_stream and new_codec else existing_codec
-    if static_conflict:
+    if static_conflict or protected_active_conflict:
         merged_source = existing['source']
     else:
         merged_source = existing['source'] if merged_is_interesting and source_name == 'findings' and existing['source'] == 'seed' else source_name

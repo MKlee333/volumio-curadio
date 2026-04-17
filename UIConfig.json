@@ -132,6 +132,18 @@
           "value": ""
         },
         {
+          "id": "lastCrawledAt",
+          "element": "text",
+          "label": "TRANSLATE.LAST_CRAWLED_AT",
+          "value": ""
+        },
+        {
+          "id": "lastCheckedAt",
+          "element": "text",
+          "label": "TRANSLATE.LAST_CHECKED_AT",
+          "value": ""
+        },
+        {
           "id": "runSync",
           "element": "button",
           "label": "TRANSLATE.RUN_SYNC_NOW",

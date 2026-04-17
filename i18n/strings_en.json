@@ -19,6 +19,8 @@
   "BLOCKED_TAG_PATTERNS": "Blocked tag patterns",
   "BLOCKED_NAME_PATTERNS": "Blocked name patterns",
   "LAST_SYNC_SUMMARY": "Last sync summary",
+  "LAST_CRAWLED_AT": "Last crawled",
+  "LAST_CHECKED_AT": "Last checked",
   "RUN_SYNC_NOW": "Sync station files now",
   "RUN_REFRESH_NOW": "Check stream URLs now",
   "RUN_DISCOVER_NOW": "Discover stations now",

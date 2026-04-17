@@ -16,5 +16,7 @@
   "blockedNamePatterns": "radio paradise,mango,christmas,xmas",
   "refreshOnStartup": true,
   "maxStationsPerSection": 250,
-  "lastSyncSummary": "Not synced yet"
+  "lastSyncSummary": "Not synced yet",
+  "lastCrawledAt": "",
+  "lastCheckedAt": ""
 }

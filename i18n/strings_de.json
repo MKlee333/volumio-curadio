@@ -19,6 +19,8 @@
   "BLOCKED_TAG_PATTERNS": "Gesperrte Tag-Muster",
   "BLOCKED_NAME_PATTERNS": "Gesperrte Namensmuster",
   "LAST_SYNC_SUMMARY": "Letzte Synchronisierung",
+  "LAST_CRAWLED_AT": "Zuletzt gecrawlt",
+  "LAST_CHECKED_AT": "Zuletzt gepruft",
   "RUN_SYNC_NOW": "Stationsdateien synchronisieren",
   "RUN_REFRESH_NOW": "Stream-URLs prufen",
   "RUN_DISCOVER_NOW": "Neue Sender suchen",

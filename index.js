@@ -81,6 +81,8 @@ ControllerCuratedRadio.prototype.getUIConfig = function() {
     this._setUIValue(uiconf, 'blockedTagPatterns', this.config.get('blockedTagPatterns') || '');
     this._setUIValue(uiconf, 'blockedNamePatterns', this.config.get('blockedNamePatterns') || '');
     this._setUIValue(uiconf, 'lastSyncSummary', this.config.get('lastSyncSummary') || '');
+    this._setUIValue(uiconf, 'lastCrawledAt', this._formatUiTimestamp(this.config.get('lastCrawledAt')));
+    this._setUIValue(uiconf, 'lastCheckedAt', this._formatUiTimestamp(this.config.get('lastCheckedAt')));
     defer.resolve(uiconf);
   }).fail((err) => defer.reject(err));
 
@@ -372,6 +374,12 @@ ControllerCuratedRadio.prototype.refreshDatabase = function(showToastOnError) {
   this.workerBusy = true;
   return this._runWorkerJson(['refresh', '--db', this._getDatabasePath()])
     .then((summary) => {
+      const checkedAt = new Date().toISOString();
+      this.config.set('lastCheckedAt', checkedAt);
+      if (!summary || typeof summary !== 'object') {
+        summary = {};
+      }
+      summary.last_checked_at = checkedAt;
       this._updateSummary(summary);
       return summary;
     })
@@ -404,6 +412,12 @@ ControllerCuratedRadio.prototype.discoverFindings = function(showToastOnError) {
     '--blocked-tags', this._getBlockedTagPatterns(),
     '--blocked-names', this._getBlockedNamePatterns()
   ]).then((summary) => {
+    const crawledAt = new Date().toISOString();
+    this.config.set('lastCrawledAt', crawledAt);
+    if (!summary || typeof summary !== 'object') {
+      summary = {};
+    }
+    summary.last_crawled_at = crawledAt;
     return summary;
   }).fail((err) => {
     if (showToastOnError !== false) {
@@ -521,6 +535,12 @@ ControllerCuratedRadio.prototype._updateSummary = function(summary) {
     parts.push('inactive ' + summary.inactive_count);
   }
   this.config.set('lastSyncSummary', parts.join(' | '));
+  if (typeof summary.last_crawled_at !== 'undefined' && summary.last_crawled_at) {
+    this.config.set('lastCrawledAt', summary.last_crawled_at);
+  }
+  if (typeof summary.last_checked_at !== 'undefined' && summary.last_checked_at) {
+    this.config.set('lastCheckedAt', summary.last_checked_at);
+  }
 };
 
 ControllerCuratedRadio.prototype._saveCurrentInterestingValue = function(value) {
@@ -662,6 +682,17 @@ ControllerCuratedRadio.prototype._setUIValue = function(uiconf, id, value) {
       }
     });
   });
+};
+
+ControllerCuratedRadio.prototype._formatUiTimestamp = function(value) {
+  if (!value) {
+    return '-';
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+  return date.toLocaleString();
 };
 
 ControllerCuratedRadio.prototype._clampInt = function(value, min, max, fallback) {

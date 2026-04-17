@@ -680,11 +680,14 @@ def upsert_station(conn, station, source_name):
     new_genre = station['genre'] or existing['genre']
     status = existing['last_status']
     needs_review = existing['needs_review']
+    review_note = existing['last_error'] or ''
     if static_conflict:
         needs_review = 1
+        review_note = 'static-url candidate: ' + station['stream_url']
     elif normalize_url(existing['stream_url']) != normalize_url(new_url):
         status = 'pending'
         needs_review = 0
+        review_note = ''
     merged_is_interesting = 1 if int_value(existing['is_interesting'], 0) or int_value(station.get('is_interesting'), 0) else 0
     merged_bitrate = max(existing_bitrate, new_bitrate) if normalize_url(new_url) == station['normalized_url'] else existing_bitrate
     if prefer_incoming_stream and new_bitrate:
@@ -700,7 +703,7 @@ def upsert_station(conn, station, source_name):
         UPDATE stations
         SET name = ?, stream_url = ?, normalized_name = ?, normalized_url = ?,
             country = ?, genre = ?, source = ?, last_seen_at = ?, updated_at = ?,
-            last_status = ?, needs_review = ?, is_new = ?, is_interesting = ?,
+            last_status = ?, needs_review = ?, last_error = ?, is_new = ?, is_interesting = ?,
             bitrate = ?, codec = ?, active = 1
         WHERE id = ?
         ''',
@@ -716,6 +719,7 @@ def upsert_station(conn, station, source_name):
             now,
             status,
             needs_review,
+            review_note,
             is_new,
             merged_is_interesting,
             merged_bitrate,

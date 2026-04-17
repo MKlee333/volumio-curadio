@@ -505,6 +505,10 @@ ControllerCuratedRadio.prototype._mapStationToItem = function(row) {
     const staticMarker = this.getI18nString('STATIC_URL_MARKER');
     subtitle = subtitle ? subtitle + ' | ' + staticMarker : staticMarker;
   }
+  if (row.last_error && String(row.last_error).indexOf('static-url candidate:') === 0) {
+    const candidateText = String(row.last_error).replace('static-url candidate:', 'candidate').trim();
+    subtitle = subtitle ? subtitle + ' | ' + candidateText : candidateText;
+  }
   if (row.last_status && row.last_status !== 'ok') {
     subtitle = subtitle ? subtitle + ' | ' + row.last_status : row.last_status;
   }

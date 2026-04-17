@@ -142,6 +142,14 @@ ControllerCuratedRadio.prototype.removeCurrentInteresting = function() {
   return this._saveCurrentInterestingValue(0);
 };
 
+ControllerCuratedRadio.prototype.saveCurrentStatic = function() {
+  return this._saveCurrentStaticValue(1);
+};
+
+ControllerCuratedRadio.prototype.removeCurrentStatic = function() {
+  return this._saveCurrentStaticValue(0);
+};
+
 ControllerCuratedRadio.prototype.addToBrowseSources = function() {
   this.commandRouter.volumioAddToBrowseSources({
     name: this.getI18nString('PLUGIN_NAME'),
@@ -493,6 +501,10 @@ ControllerCuratedRadio.prototype._mapStationToItem = function(row) {
   if (qualityLabel) {
     subtitle = subtitle ? subtitle + ' | ' + qualityLabel : qualityLabel;
   }
+  if (parseInt(row.is_static_url, 10) === 1) {
+    const staticMarker = this.getI18nString('STATIC_URL_MARKER');
+    subtitle = subtitle ? subtitle + ' | ' + staticMarker : staticMarker;
+  }
   if (row.last_status && row.last_status !== 'ok') {
     subtitle = subtitle ? subtitle + ' | ' + row.last_status : row.last_status;
   }
@@ -561,6 +573,28 @@ ControllerCuratedRadio.prototype._saveCurrentInterestingValue = function(value) 
     '--value', String(value ? 1 : 0)
   ]).then((row) => {
     this.commandRouter.pushToastMessage('success', this.getI18nString('PLUGIN_NAME'), value ? this.getI18nString('CURRENT_STATION_SAVED') : this.getI18nString('CURRENT_STATION_REMOVED'));
+    return row;
+  });
+};
+
+ControllerCuratedRadio.prototype._saveCurrentStaticValue = function(value) {
+  const state = this.commandRouter.volumioGetState ? this.commandRouter.volumioGetState() : (this.commandRouter.stateMachine && this.commandRouter.stateMachine.getState ? this.commandRouter.stateMachine.getState() : null);
+  const currentUri = state && (state.uri || state.trackUri || state.path || state.file) ? String(state.uri || state.trackUri || state.path || state.file).trim() : '';
+  if (!currentUri) {
+    this.commandRouter.pushToastMessage('error', this.getI18nString('PLUGIN_NAME'), this.getI18nString('CURRENT_STATION_MISSING'));
+    return libQ.reject(new Error('No current stream URL found'));
+  }
+
+  return this._runWorkerJson([
+    'mark-static-by-url',
+    '--db', this._getDatabasePath(),
+    '--url', currentUri,
+    '--name', String((state && (state.album || state.artist || state.service || state.title)) || '').trim(),
+    '--country', '',
+    '--genre', '',
+    '--value', String(value ? 1 : 0)
+  ]).then((row) => {
+    this.commandRouter.pushToastMessage('success', this.getI18nString('PLUGIN_NAME'), value ? this.getI18nString('CURRENT_STATION_STATIC_SAVED') : this.getI18nString('CURRENT_STATION_STATIC_REMOVED'));
     return row;
   });
 };

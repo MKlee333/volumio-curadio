@@ -89,6 +89,7 @@ def connect_db(db_path):
             is_new INTEGER NOT NULL DEFAULT 1,
             failure_count INTEGER NOT NULL DEFAULT 0,
             is_interesting INTEGER NOT NULL DEFAULT 0,
+            is_static_url INTEGER NOT NULL DEFAULT 0,
             bitrate INTEGER NOT NULL DEFAULT 0,
             codec TEXT NOT NULL DEFAULT '',
             confidence REAL NOT NULL DEFAULT 0.5
@@ -110,6 +111,22 @@ def connect_db(db_path):
             metadata_json TEXT NOT NULL DEFAULT '{}'
         );
         CREATE INDEX IF NOT EXISTS idx_evidence_candidate_key ON evidence(candidate_key);
+        CREATE TABLE IF NOT EXISTS url_change_reviews (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            station_id INTEGER NOT NULL,
+            station_name TEXT NOT NULL DEFAULT '',
+            old_stream_url TEXT NOT NULL DEFAULT '',
+            new_stream_url TEXT NOT NULL DEFAULT '',
+            normalized_new_url TEXT NOT NULL DEFAULT '',
+            candidate_name TEXT NOT NULL DEFAULT '',
+            source TEXT NOT NULL DEFAULT '',
+            first_seen_at TEXT NOT NULL,
+            last_seen_at TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            FOREIGN KEY(station_id) REFERENCES stations(id) ON DELETE CASCADE,
+            UNIQUE(station_id, normalized_new_url, status)
+        );
+        CREATE INDEX IF NOT EXISTS idx_url_change_reviews_status ON url_change_reviews(status, station_id);
         '''
     )
     ensure_station_schema(conn)
@@ -120,6 +137,8 @@ def ensure_station_schema(conn):
     columns = {row[1] for row in conn.execute('PRAGMA table_info(stations)').fetchall()}
     if 'is_interesting' not in columns:
         conn.execute("ALTER TABLE stations ADD COLUMN is_interesting INTEGER NOT NULL DEFAULT 0")
+    if 'is_static_url' not in columns:
+        conn.execute("ALTER TABLE stations ADD COLUMN is_static_url INTEGER NOT NULL DEFAULT 0")
     if 'bitrate' not in columns:
         conn.execute("ALTER TABLE stations ADD COLUMN bitrate INTEGER NOT NULL DEFAULT 0")
     if 'codec' not in columns:
@@ -649,13 +668,21 @@ def upsert_station(conn, station, source_name):
     existing_codec = existing['codec'] or ''
     existing_quality = stream_quality_key(existing_bitrate, existing_codec, existing['stream_url'])
     incoming_quality = stream_quality_key(new_bitrate, new_codec, station['stream_url'])
-    prefer_incoming_stream = station['normalized_url'] == existing['normalized_url'] or incoming_quality > existing_quality
+    existing_normalized_url = normalize_url(existing['stream_url'])
+    incoming_url_changed = station['normalized_url'] != existing_normalized_url
+    is_static_url = int_value(existing['is_static_url'], 0) == 1
+    static_conflict = is_static_url and incoming_url_changed
+    if static_conflict:
+        queue_url_change_review(conn, existing, station, source_name)
+    prefer_incoming_stream = not static_conflict and (station['normalized_url'] == existing['normalized_url'] or incoming_quality > existing_quality)
     new_url = station['stream_url'] if prefer_incoming_stream else existing['stream_url']
     new_country = station['country'] or existing['country']
     new_genre = station['genre'] or existing['genre']
     status = existing['last_status']
     needs_review = existing['needs_review']
-    if normalize_url(existing['stream_url']) != normalize_url(new_url):
+    if static_conflict:
+        needs_review = 1
+    elif normalize_url(existing['stream_url']) != normalize_url(new_url):
         status = 'pending'
         needs_review = 0
     merged_is_interesting = 1 if int_value(existing['is_interesting'], 0) or int_value(station.get('is_interesting'), 0) else 0
@@ -663,6 +690,10 @@ def upsert_station(conn, station, source_name):
     if prefer_incoming_stream and new_bitrate:
         merged_bitrate = new_bitrate
     merged_codec = new_codec if prefer_incoming_stream and new_codec else existing_codec
+    if static_conflict:
+        merged_source = existing['source']
+    else:
+        merged_source = existing['source'] if merged_is_interesting and source_name == 'findings' and existing['source'] == 'seed' else source_name
 
     conn.execute(
         '''
@@ -680,7 +711,7 @@ def upsert_station(conn, station, source_name):
             normalize_url(new_url),
             new_country,
             new_genre,
-            existing['source'] if merged_is_interesting and source_name == 'findings' and existing['source'] == 'seed' else source_name,
+            merged_source,
             now,
             now,
             status,
@@ -692,6 +723,64 @@ def upsert_station(conn, station, source_name):
             existing['id'],
         )
     )
+
+
+def queue_url_change_review(conn, existing_row, station, source_name):
+    station_id = int(existing_row['id'])
+    old_url = existing_row['stream_url']
+    new_url = station['stream_url']
+    normalized_new_url = normalize_url(new_url)
+    if not normalized_new_url or normalized_new_url == normalize_url(old_url):
+        return
+
+    now = utc_now()
+    existing_review = conn.execute(
+        '''
+        SELECT id FROM url_change_reviews
+        WHERE station_id = ? AND normalized_new_url = ? AND status = 'pending'
+        LIMIT 1
+        ''',
+        (station_id, normalized_new_url)
+    ).fetchone()
+
+    if existing_review is None:
+        conn.execute(
+            '''
+            INSERT INTO url_change_reviews (
+                station_id, station_name, old_stream_url, new_stream_url, normalized_new_url,
+                candidate_name, source, first_seen_at, last_seen_at, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+            ''',
+            (
+                station_id,
+                existing_row['name'] or station['name'],
+                old_url,
+                new_url,
+                normalized_new_url,
+                station['name'] or '',
+                source_name,
+                now,
+                now,
+            )
+        )
+    else:
+        conn.execute(
+            '''
+            UPDATE url_change_reviews
+            SET station_name = ?, old_stream_url = ?, new_stream_url = ?,
+                candidate_name = ?, source = ?, last_seen_at = ?
+            WHERE id = ?
+            ''',
+            (
+                existing_row['name'] or station['name'],
+                old_url,
+                new_url,
+                station['name'] or '',
+                source_name,
+                now,
+                existing_review['id'],
+            )
+        )
 
 
 def sync_database(conn, seed_path, findings_path):
@@ -1218,6 +1307,20 @@ def set_station_interesting(conn, station_id, value):
     return lookup_station(conn, int(station_id))
 
 
+def set_station_static(conn, station_id, value):
+    now = utc_now()
+    conn.execute(
+        '''
+        UPDATE stations
+        SET is_static_url = ?, updated_at = ?
+        WHERE id = ?
+        ''',
+        (1 if value else 0, now, int(station_id))
+    )
+    conn.commit()
+    return lookup_station(conn, int(station_id))
+
+
 def set_station_interesting_by_url(conn, url_value, name='', country='', genre='', bitrate=0, codec='', value=1):
     try:
         row = lookup_station_by_url(conn, url_value)
@@ -1252,6 +1355,50 @@ def set_station_interesting_by_url(conn, url_value, name='', country='', genre='
             now,
             now,
             now,
+            int_value(bitrate, 0),
+            codec or '',
+            0.6,
+        )
+    )
+    conn.commit()
+    return lookup_station_by_url(conn, url_value)
+
+
+def set_station_static_by_url(conn, url_value, name='', country='', genre='', bitrate=0, codec='', value=1):
+    try:
+        row = lookup_station_by_url(conn, url_value)
+        return set_station_static(conn, row['id'], value)
+    except ValueError:
+        if not value:
+            return {
+                'name': name or url_value,
+                'stream_url': url_value,
+                'is_static_url': 0,
+            }
+
+    normalized_url = normalize_url(url_value)
+    normalized_name = normalize_name(name or url_value)
+    now = utc_now()
+    conn.execute(
+        '''
+        INSERT INTO stations (
+            name, stream_url, normalized_name, normalized_url, country, genre,
+            source, first_seen_at, last_seen_at, updated_at, last_status,
+            active, needs_review, is_new, is_interesting, is_static_url, bitrate, codec, confidence
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 1, 0, 0, 0, ?, ?, ?, ?)
+        ''',
+        (
+            name or url_value,
+            url_value,
+            normalized_name,
+            normalized_url,
+            country or '',
+            genre or '',
+            'manual',
+            now,
+            now,
+            now,
+            1 if value else 0,
             int_value(bitrate, 0),
             codec or '',
             0.6,
@@ -1350,6 +1497,11 @@ def build_parser():
     interesting_parser.add_argument('--station-id', required=True)
     interesting_parser.add_argument('--value', default='1')
 
+    static_parser = subparsers.add_parser('mark-static')
+    static_parser.add_argument('--db', required=True)
+    static_parser.add_argument('--station-id', required=True)
+    static_parser.add_argument('--value', default='1')
+
     interesting_url_parser = subparsers.add_parser('mark-interesting-by-url')
     interesting_url_parser.add_argument('--db', required=True)
     interesting_url_parser.add_argument('--url', required=True)
@@ -1359,6 +1511,16 @@ def build_parser():
     interesting_url_parser.add_argument('--bitrate', default='0')
     interesting_url_parser.add_argument('--codec', default='')
     interesting_url_parser.add_argument('--value', default='1')
+
+    static_url_parser = subparsers.add_parser('mark-static-by-url')
+    static_url_parser.add_argument('--db', required=True)
+    static_url_parser.add_argument('--url', required=True)
+    static_url_parser.add_argument('--name', default='')
+    static_url_parser.add_argument('--country', default='')
+    static_url_parser.add_argument('--genre', default='')
+    static_url_parser.add_argument('--bitrate', default='0')
+    static_url_parser.add_argument('--codec', default='')
+    static_url_parser.add_argument('--value', default='1')
 
     search_parser = subparsers.add_parser('search')
     search_parser.add_argument('term')
@@ -1404,8 +1566,21 @@ def main():
             payload = lookup_station_by_url(conn, args.url)
         elif args.command == 'mark-interesting':
             payload = set_station_interesting(conn, int(args.station_id), int_value(args.value, 1))
+        elif args.command == 'mark-static':
+            payload = set_station_static(conn, int(args.station_id), int_value(args.value, 1))
         elif args.command == 'mark-interesting-by-url':
             payload = set_station_interesting_by_url(
+                conn,
+                args.url,
+                name=args.name,
+                country=args.country,
+                genre=args.genre,
+                bitrate=int_value(args.bitrate, 0),
+                codec=args.codec,
+                value=int_value(args.value, 1)
+            )
+        elif args.command == 'mark-static-by-url':
+            payload = set_station_static_by_url(
                 conn,
                 args.url,
                 name=args.name,

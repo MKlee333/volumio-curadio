@@ -192,6 +192,26 @@
             "endpoint": "music_service/curated_radio",
             "method": "removeCurrentInteresting"
           }
+        },
+        {
+          "id": "saveCurrentStatic",
+          "element": "button",
+          "label": "TRANSLATE.SAVE_CURRENT_STATIC",
+          "onClick": {
+            "type": "controller",
+            "endpoint": "music_service/curated_radio",
+            "method": "saveCurrentStatic"
+          }
+        },
+        {
+          "id": "removeCurrentStatic",
+          "element": "button",
+          "label": "TRANSLATE.REMOVE_CURRENT_STATIC",
+          "onClick": {
+            "type": "controller",
+            "endpoint": "music_service/curated_radio",
+            "method": "removeCurrentStatic"
+          }
         }
       ]
     }

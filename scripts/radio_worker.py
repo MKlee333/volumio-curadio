@@ -49,6 +49,11 @@ GENERIC_NAME_PATTERNS = (
     'top 40',
     'oldies',
 )
+TERM_STOPWORDS = {
+    'radio', 'station', 'music', 'live', 'stream', 'official', 'online', 'fm', 'am',
+    'the', 'and', 'for', 'with', 'from', 'und', 'der', 'die', 'das',
+    'mix', 'show', 'shows', 'dj', 'djs', 'podcast', 'episode'
+}
 
 
 def utc_now():
@@ -246,6 +251,21 @@ def http_get_json(url_value):
     return json.loads(payload)
 
 
+def http_post_json(url_value, payload, headers=None, timeout=20):
+    merged_headers = {
+        'User-Agent': 'CuratedRadio/0.3',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+    }
+    if headers:
+        merged_headers.update(headers)
+    data = json.dumps(payload).encode('utf-8')
+    request = urllib.request.Request(url_value, data=data, headers=merged_headers, method='POST')
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        raw = response.read().decode('utf-8', errors='ignore')
+    return json.loads(raw or '{}')
+
+
 def fetch_text_document(url_value):
     request = urllib.request.Request(
         url_value,
@@ -323,6 +343,40 @@ def strip_markup(value):
 
 def normalize_token(value):
     return re.sub(r'\s+', ' ', (value or '').strip().lower())
+
+
+def parse_bool_value(value, default=False):
+    if isinstance(value, bool):
+        return value
+    text = str(value or '').strip().lower()
+    if text in ('1', 'true', 'yes', 'on'):
+        return True
+    if text in ('0', 'false', 'no', 'off', ''):
+        return False
+    return default
+
+
+def compact_term(value):
+    token = normalize_token(value)
+    token = re.sub(r'[^a-z0-9+/#&\-\s]', ' ', token)
+    token = re.sub(r'\s+', ' ', token).strip()
+    if len(token) < 3 or token.isdigit() or token in TERM_STOPWORDS:
+        return ''
+    return token
+
+
+def term_tokens_from_text(value):
+    lowered = normalize_token(value)
+    raw_tokens = re.split(r'[^a-z0-9+/#&-]+', lowered)
+    tokens = []
+    seen = set()
+    for raw in raw_tokens:
+        token = compact_term(raw)
+        if not token or token in seen:
+            continue
+        seen.add(token)
+        tokens.append(token)
+    return tokens
 
 
 def matches_pattern_list(value, patterns):
@@ -958,6 +1012,168 @@ def discovery_score(entry, matched_tag_count):
     return matched_tag_count * 200 + votes * 3 + min(clickcount, 1500) + min(bitrate, 320) + favicon_bonus + ssl_bonus + homepage_bonus - popularity_penalty
 
 
+def build_term_cloud(conn, seed_terms, blocked_patterns, limit_terms):
+    limit_terms = max(10, min(int_value(limit_terms, 40), 160))
+    term_scores = {}
+
+    def add_term(term, points):
+        token = compact_term(term)
+        if not token:
+            return
+        if matches_pattern_list(token, blocked_patterns):
+            return
+        term_scores[token] = term_scores.get(token, 0) + max(1, int(points))
+
+    for term in seed_terms or []:
+        add_term(term, 80)
+
+    station_rows = query_rows(
+        conn,
+        '''
+        SELECT name, country, genre, source, is_interesting, is_static_url, confidence
+        FROM stations
+        WHERE active = 1
+        ORDER BY is_interesting DESC, is_static_url DESC, confidence DESC, updated_at DESC
+        LIMIT 600
+        '''
+    )
+    for row in station_rows:
+        weight = 3
+        if int_value(row.get('is_interesting'), 0):
+            weight += 8
+        if int_value(row.get('is_static_url'), 0):
+            weight += 8
+        if (row.get('source') or '') in ('interesting', 'manual'):
+            weight += 4
+        if float(row.get('confidence') or 0.0) >= 0.85:
+            weight += 4
+
+        for tag in tokenize_genres(row.get('genre') or ''):
+            add_term(tag, weight * 4)
+            for token in term_tokens_from_text(tag):
+                add_term(token, weight * 3)
+        for token in term_tokens_from_text(base_display_name(row.get('name') or '')):
+            add_term(token, weight)
+        for token in term_tokens_from_text(row.get('country') or ''):
+            add_term(token, 1)
+
+    evidence_rows = query_rows(
+        conn,
+        '''
+        SELECT title, excerpt, confidence
+        FROM evidence
+        ORDER BY confidence DESC, last_seen_at DESC
+        LIMIT 500
+        '''
+    )
+    for row in evidence_rows:
+        confidence = float(row.get('confidence') or 0.0)
+        weight = 1 + int(min(8, confidence * 10))
+        for token in term_tokens_from_text((row.get('title') or '') + ' ' + (row.get('excerpt') or '')):
+            if token in CURATION_SIGNAL_PATTERNS:
+                add_term(token, weight * 3)
+            else:
+                add_term(token, weight)
+
+    sorted_terms = sorted(term_scores.items(), key=lambda item: (-item[1], item[0]))
+    return [item[0] for item in sorted_terms[:limit_terms]]
+
+
+def parse_json_object_text(value):
+    text = (value or '').strip()
+    if not text:
+        return {}
+    fenced = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', text, re.I | re.S)
+    if fenced:
+        text = fenced.group(1)
+    first = text.find('{')
+    last = text.rfind('}')
+    if first >= 0 and last > first:
+        text = text[first:last + 1]
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, dict):
+            return parsed
+    except Exception:
+        return {}
+    return {}
+
+
+def ai_expand_discovery_terms(profile_prompt, term_cloud, blocked_terms, enabled, api_base, model, api_key, ai_term_limit):
+    if not parse_bool_value(enabled, False):
+        return {'prefer_terms': [], 'avoid_terms': [], 'used': False, 'error': ''}
+    key_value = (api_key or '').strip()
+    base_value = (api_base or '').strip().rstrip('/')
+    model_value = (model or '').strip()
+    if not key_value or not base_value or not model_value:
+        return {'prefer_terms': [], 'avoid_terms': [], 'used': False, 'error': 'missing_ai_config'}
+
+    limit_value = max(0, min(int_value(ai_term_limit, 12), 40))
+    if limit_value <= 0:
+        return {'prefer_terms': [], 'avoid_terms': [], 'used': False, 'error': ''}
+
+    cloud_seed = list(term_cloud or [])[:60]
+    blocked_seed = list(dict.fromkeys([compact_term(item) for item in blocked_terms if compact_term(item)]))[:40]
+    endpoint = base_value + '/chat/completions' if not base_value.endswith('/chat/completions') else base_value
+    payload = {
+        'model': model_value,
+        'temperature': 0.2,
+        'messages': [
+            {
+                'role': 'system',
+                'content': 'You optimize discovery terms for independent and curated online radio stations. Return JSON only.'
+            },
+            {
+                'role': 'user',
+                'content': json.dumps({
+                    'task': 'Suggest concise discovery terms to find non-mainstream curated stations.',
+                    'profile_prompt': profile_prompt or '',
+                    'existing_term_cloud': cloud_seed,
+                    'blocked_terms': blocked_seed,
+                    'return_schema': {
+                        'prefer_terms': ['string'],
+                        'avoid_terms': ['string'],
+                    },
+                    'max_terms': limit_value,
+                }, ensure_ascii=False)
+            }
+        ]
+    }
+
+    try:
+        response = http_post_json(
+            endpoint,
+            payload,
+            headers={'Authorization': 'Bearer ' + key_value},
+            timeout=25,
+        )
+        choices = response.get('choices') if isinstance(response, dict) else None
+        content = ''
+        if isinstance(choices, list) and choices:
+            message = choices[0].get('message') if isinstance(choices[0], dict) else None
+            if isinstance(message, dict):
+                content = message.get('content') or ''
+        data = parse_json_object_text(content)
+        prefer_terms = []
+        avoid_terms = []
+        for term in data.get('prefer_terms', []):
+            compact = compact_term(term)
+            if compact and compact not in prefer_terms:
+                prefer_terms.append(compact)
+        for term in data.get('avoid_terms', []):
+            compact = compact_term(term)
+            if compact and compact not in avoid_terms:
+                avoid_terms.append(compact)
+        return {
+            'prefer_terms': prefer_terms[:limit_value],
+            'avoid_terms': avoid_terms[:limit_value],
+            'used': True,
+            'error': '',
+        }
+    except Exception as exc:
+        return {'prefer_terms': [], 'avoid_terms': [], 'used': False, 'error': str(exc)}
+
+
 def build_discovery_urls(api_base, limit, tag_seeds):
     request_limit = max(25, min(int(limit), 100))
     base = api_base.rstrip('/')
@@ -968,27 +1184,159 @@ def build_discovery_urls(api_base, limit, tag_seeds):
     return urls
 
 
-def discover_stations(conn, output_path, api_base, limit, profile_prompt, editorial_sources_csv, tag_seeds_csv, blocked_tags_csv, blocked_names_csv):
+def build_term_search_urls(api_base, limit, terms):
+    request_limit = max(25, min(int_value(limit, 80), 120))
+    base = api_base.rstrip('/')
+    urls = []
+    for term in terms or []:
+        encoded = urllib.parse.quote(term)
+        urls.append('{}/json/stations/search?name={}&hidebroken=true&order=clickcount&reverse=true&limit={}'.format(base, encoded, request_limit))
+    return urls
+
+
+def discover_stations(conn, output_path, api_base, limit, profile_prompt, editorial_sources_csv, tag_seeds_csv, blocked_tags_csv, blocked_names_csv, cloud_term_limit=40, ai_enabled=False, ai_api_base='', ai_model='', ai_api_key='', ai_term_limit=12):
     known_rows = query_rows(conn, 'SELECT normalized_name, normalized_url FROM stations')
     known_names = {row['normalized_name'] for row in known_rows}
     known_urls = {row['normalized_url'] for row in known_rows}
     profile = parse_profile_prompt(profile_prompt)
-    tag_seeds = csv_tokens(tag_seeds_csv)
+    configured_tag_seeds = csv_tokens(tag_seeds_csv)
     blocked_tags = csv_tokens(blocked_tags_csv)
     blocked_names = csv_tokens(blocked_names_csv)
     prompt_prefers = profile['prefer'] + profile['must']
     prompt_avoids = profile['avoid']
     source_directives = parse_source_directives(profile.get('sources', []), editorial_sources_csv)
     editorial_docs = extract_editorial_documents(source_directives['source_urls'])
-    tag_seeds = list(dict.fromkeys(tag_seeds + prompt_prefers))
+
+    seed_terms = list(dict.fromkeys(configured_tag_seeds + prompt_prefers))
     blocked_tags = list(dict.fromkeys(blocked_tags + prompt_avoids))
     blocked_names = list(dict.fromkeys(blocked_names + prompt_avoids))
-    normalized_tag_seeds = [normalize_token(tag) for tag in tag_seeds]
-    normalized_prompt_prefers = [normalize_token(item) for item in prompt_prefers]
+    blocked_patterns = list(dict.fromkeys(blocked_tags + blocked_names))
+
+    term_cloud = build_term_cloud(conn, seed_terms, blocked_patterns, cloud_term_limit)
+    ai_terms = ai_expand_discovery_terms(
+        profile_prompt,
+        term_cloud,
+        blocked_patterns,
+        ai_enabled,
+        ai_api_base,
+        ai_model,
+        ai_api_key,
+        ai_term_limit,
+    )
+    if ai_terms.get('prefer_terms'):
+        term_cloud = list(dict.fromkeys(term_cloud + ai_terms['prefer_terms']))
+    if ai_terms.get('avoid_terms'):
+        blocked_tags = list(dict.fromkeys(blocked_tags + ai_terms['avoid_terms']))
+        blocked_names = list(dict.fromkeys(blocked_names + ai_terms['avoid_terms']))
+        blocked_patterns = list(dict.fromkeys(blocked_tags + blocked_names))
+        term_cloud = [term for term in term_cloud if not matches_pattern_list(term, blocked_patterns)]
+
+    normalized_search_terms = [normalize_token(term) for term in term_cloud if normalize_token(term)]
+    normalized_prompt_prefers = [normalize_token(item) for item in prompt_prefers if normalize_token(item)]
 
     candidates_by_name = {}
+    stage_accepted = {'tag': 0, 'term_cloud': 0}
 
-    for url_value in build_discovery_urls(api_base, limit, tag_seeds):
+    def add_candidate_from_entry(entry, stage_label):
+        if not isinstance(entry, dict):
+            return
+        if str(entry.get('lastcheckok', '1')).lower() in ('0', 'false', 'no'):
+            return
+
+        tags = entry_tags(entry)
+        name_hint = entry.get('name') or ''
+        homepage = (entry.get('homepage') or '').strip()
+        search_blob = normalize_token(name_hint + ' ' + ' '.join(tags) + ' ' + homepage)
+        matched_terms = [term for term in normalized_search_terms if term and (term in search_blob or any(term in tag for tag in tags))]
+        if not matched_terms:
+            return
+
+        has_curation_signal = any(any(signal in tag for signal in CURATION_SIGNAL_PATTERNS) for tag in tags) or any(signal in search_blob for signal in CURATION_SIGNAL_PATTERNS)
+        if not has_curation_signal:
+            if len(matched_terms) < 2:
+                return
+            if is_generic_format_name(name_hint):
+                return
+
+        if any(matches_pattern_list(tag, blocked_tags) for tag in tags):
+            return
+        if matches_pattern_list(name_hint, blocked_names):
+            return
+        if matches_pattern_list(search_blob, blocked_patterns):
+            return
+
+        prompt_preference_matches = [pref for pref in normalized_prompt_prefers if pref and pref in search_blob]
+        name = format_discovered_name(entry)
+        stream_url = (entry.get('url_resolved') or entry.get('url') or '').strip()
+        if not name or not stream_url:
+            return
+        normalized_name = normalize_name(name)
+        normalized_url = normalize_url(stream_url)
+        if not normalized_name or not normalized_url:
+            return
+        if normalized_name in known_names or normalized_url in known_urls:
+            return
+        if not stream_url.startswith('http://') and not stream_url.startswith('https://'):
+            return
+
+        bitrate_value = int_value(entry.get('bitrate'), 0)
+        codec_value = (entry.get('codec') or '').strip()
+        candidate_key = normalized_url or normalized_name
+        rb_confidence = min(0.92, 0.35 + len(matched_terms) * 0.08 + (0.05 if has_curation_signal else 0))
+        upsert_evidence(
+            conn,
+            candidate_key,
+            name,
+            stream_url,
+            'radio_browser_' + stage_label,
+            'radio_browser',
+            homepage,
+            name_hint or name,
+            'terms=' + ','.join(matched_terms[:8]),
+            rb_confidence,
+            {
+                'stage': stage_label,
+                'matched_terms': matched_terms,
+                'prompt_preference_matches': prompt_preference_matches,
+                'votes': entry.get('votes'),
+                'clickcount': entry.get('clickcount'),
+                'homepage': homepage,
+                'country': entry.get('country'),
+                'bitrate': bitrate_value,
+                'codec': codec_value,
+            }
+        )
+        stage_bonus = 70 if stage_label == 'term_cloud' else 0
+        candidate = {
+            '_candidate_key': candidate_key,
+            '_normalized_name': normalized_name,
+            '_normalized_url': normalized_url,
+            'service': 'webradio',
+            'title': '',
+            'name': name,
+            'uri': stream_url,
+            'bitrate': bitrate_value,
+            'codec': codec_value,
+            '_homepage': homepage,
+            '_matched_tags': matched_terms,
+            '_prompt_preference_matches': prompt_preference_matches,
+            '_has_curation_signal': has_curation_signal,
+            '_score': discovery_score(entry, len(matched_terms)) + len(prompt_preference_matches) * 120 + bitrate_value * 6 + stage_bonus,
+        }
+        existing_candidate = candidates_by_name.get(normalized_name)
+        if (
+            existing_candidate is None or
+            candidate['_score'] > existing_candidate['_score'] or
+            (
+                candidate['_score'] == existing_candidate['_score'] and
+                stream_quality_key(candidate['bitrate'], candidate['codec'], candidate['uri']) >
+                stream_quality_key(existing_candidate['bitrate'], existing_candidate['codec'], existing_candidate['uri'])
+            )
+        ):
+            candidates_by_name[normalized_name] = candidate
+            stage_accepted[stage_label] = stage_accepted.get(stage_label, 0) + 1
+
+    for url_value in build_discovery_urls(api_base, limit, seed_terms):
         try:
             payload = http_get_json(url_value)
         except Exception:
@@ -996,84 +1344,17 @@ def discover_stations(conn, output_path, api_base, limit, profile_prompt, editor
         if not isinstance(payload, list):
             continue
         for entry in payload:
-            if not isinstance(entry, dict):
-                continue
-            if str(entry.get('lastcheckok', '1')).lower() in ('0', 'false', 'no'):
-                continue
-            tags = entry_tags(entry)
-            if not tags:
-                continue
-            matched_tags = [tag for tag in tags if any(seed in tag for seed in normalized_tag_seeds)]
-            if not matched_tags:
-                continue
-            has_curation_signal = any(any(signal in tag for signal in CURATION_SIGNAL_PATTERNS) for tag in tags)
-            if not has_curation_signal:
-                if len(matched_tags) < 2:
-                    continue
-                if is_generic_format_name(entry.get('name') or ''):
-                    continue
-            if any(matches_pattern_list(tag, blocked_tags) for tag in tags):
-                continue
-            if matches_pattern_list(entry.get('name') or '', blocked_names):
-                continue
-            prompt_preference_matches = [tag for tag in tags if any(pref in tag for pref in normalized_prompt_prefers if pref)]
-            name = format_discovered_name(entry)
-            stream_url = (entry.get('url_resolved') or entry.get('url') or '').strip()
-            if not name or not stream_url:
-                continue
-            normalized_name = normalize_name(name)
-            normalized_url = normalize_url(stream_url)
-            if not normalized_name or not normalized_url:
-                continue
-            if normalized_name in known_names or normalized_url in known_urls:
-                continue
-            if not stream_url.startswith('http://') and not stream_url.startswith('https://'):
-                continue
-            bitrate_value = int_value(entry.get('bitrate'), 0)
-            codec_value = (entry.get('codec') or '').strip()
-            candidate_key = normalized_url or normalized_name
-            rb_confidence = min(0.9, 0.35 + len(matched_tags) * 0.08 + (0.05 if has_curation_signal else 0))
-            upsert_evidence(
-                conn,
-                candidate_key,
-                name,
-                stream_url,
-                'radio_browser',
-                'radio_browser',
-                entry.get('homepage') or '',
-                entry.get('name') or name,
-                'tags=' + ','.join(tags[:6]),
-                rb_confidence,
-                {
-                    'matched_tags': matched_tags,
-                    'prompt_preference_matches': prompt_preference_matches,
-                    'votes': entry.get('votes'),
-                    'clickcount': entry.get('clickcount'),
-                    'homepage': entry.get('homepage'),
-                    'country': entry.get('country'),
-                    'bitrate': bitrate_value,
-                    'codec': codec_value,
-                }
-            )
-            candidate = {
-                '_candidate_key': candidate_key,
-                '_normalized_name': normalized_name,
-                '_normalized_url': normalized_url,
-                'service': 'webradio',
-                'title': '',
-                'name': name,
-                'uri': stream_url,
-                'bitrate': bitrate_value,
-                'codec': codec_value,
-                '_homepage': (entry.get('homepage') or '').strip(),
-                '_matched_tags': matched_tags,
-                '_prompt_preference_matches': prompt_preference_matches,
-                '_has_curation_signal': has_curation_signal,
-                '_score': discovery_score(entry, len(matched_tags)) + len(prompt_preference_matches) * 120 + bitrate_value * 6,
-            }
-            existing_candidate = candidates_by_name.get(normalized_name)
-            if existing_candidate is None or stream_quality_key(candidate['bitrate'], candidate['codec'], candidate['uri']) > stream_quality_key(existing_candidate['bitrate'], existing_candidate['codec'], existing_candidate['uri']):
-                candidates_by_name[normalized_name] = candidate
+            add_candidate_from_entry(entry, 'tag')
+
+    for url_value in build_term_search_urls(api_base, limit, term_cloud):
+        try:
+            payload = http_get_json(url_value)
+        except Exception:
+            continue
+        if not isinstance(payload, list):
+            continue
+        for entry in payload:
+            add_candidate_from_entry(entry, 'term_cloud')
 
     candidates = list(candidates_by_name.values())
     candidates.sort(key=lambda item: (-item['_score'], -int_value(item.get('bitrate'), 0), item['name'].lower()))
@@ -1166,6 +1447,13 @@ def discover_stations(conn, output_path, api_base, limit, profile_prompt, editor
     return {
         'candidate_count': len(candidates),
         'written_count': len(selected),
+        'term_cloud_size': len(term_cloud),
+        'accepted_tag_stage': stage_accepted.get('tag', 0),
+        'accepted_term_cloud_stage': stage_accepted.get('term_cloud', 0),
+        'ai_enabled': parse_bool_value(ai_enabled, False),
+        'ai_used': bool(ai_terms.get('used')),
+        'ai_term_count': len(ai_terms.get('prefer_terms') or []),
+        'ai_error': ai_terms.get('error') or '',
         'editorial_source_count': len(source_directives['source_urls']),
         'editorial_document_count': len(editorial_docs),
         'output_path': output_path,
@@ -1477,6 +1765,12 @@ def build_parser():
     discover_parser.add_argument('--tags', required=True)
     discover_parser.add_argument('--blocked-tags', default='')
     discover_parser.add_argument('--blocked-names', default='')
+    discover_parser.add_argument('--cloud-term-limit', default='40')
+    discover_parser.add_argument('--ai-enabled', default='0')
+    discover_parser.add_argument('--ai-api-base', default='')
+    discover_parser.add_argument('--ai-model', default='')
+    discover_parser.add_argument('--ai-api-key', default='')
+    discover_parser.add_argument('--ai-term-limit', default='12')
 
     stats_parser = subparsers.add_parser('stats')
     stats_parser.add_argument('--db', required=True)
@@ -1562,7 +1856,13 @@ def main():
                 args.editorial_sources,
                 args.tags,
                 args.blocked_tags,
-                args.blocked_names
+                args.blocked_names,
+                args.cloud_term_limit,
+                args.ai_enabled,
+                args.ai_api_base,
+                args.ai_model,
+                args.ai_api_key,
+                args.ai_term_limit,
             )
         elif args.command == 'stats':
             payload = stats(conn)

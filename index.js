@@ -80,6 +80,12 @@ ControllerCuratedRadio.prototype.getUIConfig = function() {
     this._setUIValue(uiconf, 'curatedTagSeeds', this.config.get('curatedTagSeeds') || '');
     this._setUIValue(uiconf, 'blockedTagPatterns', this.config.get('blockedTagPatterns') || '');
     this._setUIValue(uiconf, 'blockedNamePatterns', this.config.get('blockedNamePatterns') || '');
+    this._setUIValue(uiconf, 'discoveryCloudTermLimit', String(this.config.get('discoveryCloudTermLimit') || 40));
+    this._setUIValue(uiconf, 'discoveryAiEnabled', !!this.config.get('discoveryAiEnabled'));
+    this._setUIValue(uiconf, 'discoveryAiApiBase', this.config.get('discoveryAiApiBase') || 'https://api.openai.com/v1');
+    this._setUIValue(uiconf, 'discoveryAiModel', this.config.get('discoveryAiModel') || 'gpt-4o-mini');
+    this._setUIValue(uiconf, 'discoveryAiApiKey', this.config.get('discoveryAiApiKey') || '');
+    this._setUIValue(uiconf, 'discoveryAiTermLimit', String(this.config.get('discoveryAiTermLimit') || 12));
     this._setUIValue(uiconf, 'lastSyncSummary', this.config.get('lastSyncSummary') || '');
     this._setUIValue(uiconf, 'lastCrawledAt', this._formatUiTimestamp(this.config.get('lastCrawledAt')));
     this._setUIValue(uiconf, 'lastCheckedAt', this._formatUiTimestamp(this.config.get('lastCheckedAt')));
@@ -104,6 +110,12 @@ ControllerCuratedRadio.prototype.saveBasicConfig = function(data) {
   this.config.set('curatedTagSeeds', String(data.curatedTagSeeds || '').trim() || 'underground,eclectic,electronic,experimental,leftfield,ambient,downtempo,house,techno,dub,dubstep,jungle,garage,lofi,hip hop,jazz,soul,reggae,community');
   this.config.set('blockedTagPatterns', String(data.blockedTagPatterns || '').trim() || 'christmas,xmas,pop,hits,charts,top 40,oldies,schlager,country,religious,talk,news,sports');
   this.config.set('blockedNamePatterns', String(data.blockedNamePatterns || '').trim() || 'radio paradise,mango,christmas,xmas');
+  this.config.set('discoveryCloudTermLimit', this._clampInt(data.discoveryCloudTermLimit, 10, 160, 40));
+  this.config.set('discoveryAiEnabled', !!data.discoveryAiEnabled);
+  this.config.set('discoveryAiApiBase', String(data.discoveryAiApiBase || '').trim() || 'https://api.openai.com/v1');
+  this.config.set('discoveryAiModel', String(data.discoveryAiModel || '').trim() || 'gpt-4o-mini');
+  this.config.set('discoveryAiApiKey', String(data.discoveryAiApiKey || '').trim());
+  this.config.set('discoveryAiTermLimit', this._clampInt(data.discoveryAiTermLimit, 0, 40, 12));
   this._scheduleRefreshTimer();
   this.commandRouter.pushToastMessage('success', this.getI18nString('PLUGIN_NAME'), this.getI18nString('SETTINGS_SAVED'));
   return this.syncDatabase(false);
@@ -418,7 +430,13 @@ ControllerCuratedRadio.prototype.discoverFindings = function(showToastOnError) {
     '--editorial-sources', this._getEditorialSourceUrls(),
     '--tags', this._getCuratedTagSeeds(),
     '--blocked-tags', this._getBlockedTagPatterns(),
-    '--blocked-names', this._getBlockedNamePatterns()
+    '--blocked-names', this._getBlockedNamePatterns(),
+    '--cloud-term-limit', String(this._getDiscoveryCloudTermLimit()),
+    '--ai-enabled', this.config.get('discoveryAiEnabled') ? '1' : '0',
+    '--ai-api-base', this._getDiscoveryAiApiBase(),
+    '--ai-model', this._getDiscoveryAiModel(),
+    '--ai-api-key', this._getDiscoveryAiApiKey(),
+    '--ai-term-limit', String(this._getDiscoveryAiTermLimit())
   ]).then((summary) => {
     const crawledAt = new Date().toISOString();
     this.config.set('lastCrawledAt', crawledAt);
@@ -549,6 +567,18 @@ ControllerCuratedRadio.prototype._updateSummary = function(summary) {
   }
   if (typeof summary.inactive_count !== 'undefined') {
     parts.push('inactive ' + summary.inactive_count);
+  }
+  if (typeof summary.term_cloud_size !== 'undefined') {
+    parts.push('cloud ' + summary.term_cloud_size);
+  }
+  if (typeof summary.accepted_tag_stage !== 'undefined') {
+    parts.push('tag-stage ' + summary.accepted_tag_stage);
+  }
+  if (typeof summary.accepted_term_cloud_stage !== 'undefined') {
+    parts.push('term-stage ' + summary.accepted_term_cloud_stage);
+  }
+  if (summary.ai_used) {
+    parts.push('ai-terms ' + (summary.ai_term_count || 0));
   }
   this.config.set('lastSyncSummary', parts.join(' | '));
   if (typeof summary.last_crawled_at !== 'undefined' && summary.last_crawled_at) {
@@ -797,4 +827,24 @@ ControllerCuratedRadio.prototype._getBlockedTagPatterns = function() {
 
 ControllerCuratedRadio.prototype._getBlockedNamePatterns = function() {
   return this.config.get('blockedNamePatterns') || 'radio paradise,mango,christmas,xmas';
+};
+
+ControllerCuratedRadio.prototype._getDiscoveryCloudTermLimit = function() {
+  return this._clampInt(this.config.get('discoveryCloudTermLimit'), 10, 160, 40);
+};
+
+ControllerCuratedRadio.prototype._getDiscoveryAiApiBase = function() {
+  return this.config.get('discoveryAiApiBase') || 'https://api.openai.com/v1';
+};
+
+ControllerCuratedRadio.prototype._getDiscoveryAiModel = function() {
+  return this.config.get('discoveryAiModel') || 'gpt-4o-mini';
+};
+
+ControllerCuratedRadio.prototype._getDiscoveryAiApiKey = function() {
+  return this.config.get('discoveryAiApiKey') || process.env.OPENAI_API_KEY || '';
+};
+
+ControllerCuratedRadio.prototype._getDiscoveryAiTermLimit = function() {
+  return this._clampInt(this.config.get('discoveryAiTermLimit'), 0, 40, 12);
 };

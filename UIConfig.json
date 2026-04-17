@@ -29,7 +29,13 @@
           "editorialSourceUrls",
           "curatedTagSeeds",
           "blockedTagPatterns",
-          "blockedNamePatterns"
+          "blockedNamePatterns",
+          "discoveryCloudTermLimit",
+          "discoveryAiEnabled",
+          "discoveryAiApiBase",
+          "discoveryAiModel",
+          "discoveryAiApiKey",
+          "discoveryAiTermLimit"
         ]
       },
       "content": [
@@ -116,6 +122,42 @@
           "element": "text",
           "label": "TRANSLATE.BLOCKED_NAME_PATTERNS",
           "value": ""
+        },
+        {
+          "id": "discoveryCloudTermLimit",
+          "element": "text",
+          "label": "TRANSLATE.DISCOVERY_CLOUD_TERM_LIMIT",
+          "value": "40"
+        },
+        {
+          "id": "discoveryAiEnabled",
+          "element": "switch",
+          "label": "TRANSLATE.DISCOVERY_AI_ENABLED",
+          "value": false
+        },
+        {
+          "id": "discoveryAiApiBase",
+          "element": "text",
+          "label": "TRANSLATE.DISCOVERY_AI_API_BASE",
+          "value": "https://api.openai.com/v1"
+        },
+        {
+          "id": "discoveryAiModel",
+          "element": "text",
+          "label": "TRANSLATE.DISCOVERY_AI_MODEL",
+          "value": "gpt-4o-mini"
+        },
+        {
+          "id": "discoveryAiApiKey",
+          "element": "text",
+          "label": "TRANSLATE.DISCOVERY_AI_API_KEY",
+          "value": ""
+        },
+        {
+          "id": "discoveryAiTermLimit",
+          "element": "text",
+          "label": "TRANSLATE.DISCOVERY_AI_TERM_LIMIT",
+          "value": "12"
         }
       ]
     },

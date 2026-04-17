@@ -43,6 +43,7 @@
           "id": "enabled",
           "element": "switch",
           "label": "TRANSLATE.ENABLED",
+          "doc": "TRANSLATE.DOC_ENABLED",
           "value": true
         },
         {
@@ -50,6 +51,7 @@
           "element": "input",
           "type": "text",
           "label": "TRANSLATE.DATABASE_PATH",
+          "doc": "TRANSLATE.DOC_DATABASE_PATH",
           "value": ""
         },
         {
@@ -57,6 +59,7 @@
           "element": "input",
           "type": "text",
           "label": "TRANSLATE.SEED_JSON_PATH",
+          "doc": "TRANSLATE.DOC_SEED_JSON_PATH",
           "value": ""
         },
         {
@@ -64,18 +67,21 @@
           "element": "input",
           "type": "text",
           "label": "TRANSLATE.FINDINGS_JSON_PATH",
+          "doc": "TRANSLATE.DOC_FINDINGS_JSON_PATH",
           "value": ""
         },
         {
           "id": "autoRefresh",
           "element": "switch",
           "label": "TRANSLATE.AUTO_REFRESH",
+          "doc": "TRANSLATE.DOC_AUTO_REFRESH",
           "value": true
         },
         {
           "id": "autoDiscover",
           "element": "switch",
           "label": "TRANSLATE.AUTO_DISCOVER",
+          "doc": "TRANSLATE.DOC_AUTO_DISCOVER",
           "value": true
         },
         {
@@ -83,6 +89,7 @@
           "element": "input",
           "type": "number",
           "label": "TRANSLATE.REFRESH_INTERVAL_MINUTES",
+          "doc": "TRANSLATE.DOC_REFRESH_INTERVAL_MINUTES",
           "value": "360"
         },
         {
@@ -90,6 +97,7 @@
           "element": "input",
           "type": "text",
           "label": "TRANSLATE.DISCOVERY_API_BASE",
+          "doc": "TRANSLATE.DOC_DISCOVERY_API_BASE",
           "value": ""
         },
         {
@@ -97,6 +105,7 @@
           "element": "input",
           "type": "number",
           "label": "TRANSLATE.DISCOVERY_LIMIT",
+          "doc": "TRANSLATE.DOC_DISCOVERY_LIMIT",
           "value": "80"
         },
         {
@@ -104,6 +113,7 @@
           "element": "input",
           "type": "text",
           "label": "TRANSLATE.DISCOVERY_PROFILE_PROMPT",
+          "doc": "TRANSLATE.DOC_DISCOVERY_PROFILE_PROMPT",
           "value": ""
         },
         {
@@ -111,6 +121,7 @@
           "element": "input",
           "type": "text",
           "label": "TRANSLATE.EDITORIAL_SOURCE_URLS",
+          "doc": "TRANSLATE.DOC_EDITORIAL_SOURCE_URLS",
           "value": ""
         },
         {
@@ -118,6 +129,7 @@
           "element": "input",
           "type": "text",
           "label": "TRANSLATE.CURATED_TAG_SEEDS",
+          "doc": "TRANSLATE.DOC_CURATED_TAG_SEEDS",
           "value": ""
         },
         {
@@ -125,6 +137,7 @@
           "element": "input",
           "type": "text",
           "label": "TRANSLATE.BLOCKED_TAG_PATTERNS",
+          "doc": "TRANSLATE.DOC_BLOCKED_TAG_PATTERNS",
           "value": ""
         },
         {
@@ -132,6 +145,7 @@
           "element": "input",
           "type": "text",
           "label": "TRANSLATE.BLOCKED_NAME_PATTERNS",
+          "doc": "TRANSLATE.DOC_BLOCKED_NAME_PATTERNS",
           "value": ""
         },
         {
@@ -139,12 +153,14 @@
           "element": "input",
           "type": "number",
           "label": "TRANSLATE.DISCOVERY_CLOUD_TERM_LIMIT",
+          "doc": "TRANSLATE.DOC_DISCOVERY_CLOUD_TERM_LIMIT",
           "value": "40"
         },
         {
           "id": "discoveryAiEnabled",
           "element": "switch",
           "label": "TRANSLATE.DISCOVERY_AI_ENABLED",
+          "doc": "TRANSLATE.DOC_DISCOVERY_AI_ENABLED",
           "value": false
         },
         {
@@ -152,6 +168,7 @@
           "element": "input",
           "type": "text",
           "label": "TRANSLATE.DISCOVERY_AI_API_BASE",
+          "doc": "TRANSLATE.DOC_DISCOVERY_AI_API_BASE",
           "value": "https://api.openai.com/v1"
         },
         {
@@ -159,6 +176,7 @@
           "element": "input",
           "type": "text",
           "label": "TRANSLATE.DISCOVERY_AI_MODEL",
+          "doc": "TRANSLATE.DOC_DISCOVERY_AI_MODEL",
           "value": "gpt-4o-mini"
         },
         {
@@ -166,6 +184,7 @@
           "element": "input",
           "type": "text",
           "label": "TRANSLATE.DISCOVERY_AI_API_KEY",
+          "doc": "TRANSLATE.DOC_DISCOVERY_AI_API_KEY",
           "value": ""
         },
         {
@@ -173,6 +192,7 @@
           "element": "input",
           "type": "number",
           "label": "TRANSLATE.DISCOVERY_AI_TERM_LIMIT",
+          "doc": "TRANSLATE.DOC_DISCOVERY_AI_TERM_LIMIT",
           "value": "12"
         }
       ]
@@ -191,6 +211,7 @@
             "disabled"
           ],
           "label": "TRANSLATE.LAST_SYNC_SUMMARY",
+          "doc": "TRANSLATE.DOC_LAST_SYNC_SUMMARY",
           "value": ""
         },
         {
@@ -201,6 +222,7 @@
             "disabled"
           ],
           "label": "TRANSLATE.LAST_CRAWLED_AT",
+          "doc": "TRANSLATE.DOC_LAST_CRAWLED_AT",
           "value": ""
         },
         {
@@ -211,6 +233,7 @@
             "disabled"
           ],
           "label": "TRANSLATE.LAST_CHECKED_AT",
+          "doc": "TRANSLATE.DOC_LAST_CHECKED_AT",
           "value": ""
         },
         {

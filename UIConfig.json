@@ -47,19 +47,22 @@
         },
         {
           "id": "databasePath",
-          "element": "text",
+          "element": "input",
+          "type": "text",
           "label": "TRANSLATE.DATABASE_PATH",
           "value": ""
         },
         {
           "id": "seedJsonPath",
-          "element": "text",
+          "element": "input",
+          "type": "text",
           "label": "TRANSLATE.SEED_JSON_PATH",
           "value": ""
         },
         {
           "id": "findingsJsonPath",
-          "element": "text",
+          "element": "input",
+          "type": "text",
           "label": "TRANSLATE.FINDINGS_JSON_PATH",
           "value": ""
         },
@@ -77,55 +80,64 @@
         },
         {
           "id": "refreshIntervalMinutes",
-          "element": "text",
+          "element": "input",
+          "type": "number",
           "label": "TRANSLATE.REFRESH_INTERVAL_MINUTES",
           "value": "360"
         },
         {
           "id": "discoveryApiBase",
-          "element": "text",
+          "element": "input",
+          "type": "text",
           "label": "TRANSLATE.DISCOVERY_API_BASE",
           "value": ""
         },
         {
           "id": "discoveryLimit",
-          "element": "text",
+          "element": "input",
+          "type": "number",
           "label": "TRANSLATE.DISCOVERY_LIMIT",
           "value": "80"
         },
         {
           "id": "discoveryProfilePrompt",
-          "element": "text",
+          "element": "input",
+          "type": "text",
           "label": "TRANSLATE.DISCOVERY_PROFILE_PROMPT",
           "value": ""
         },
         {
           "id": "editorialSourceUrls",
-          "element": "text",
+          "element": "input",
+          "type": "text",
           "label": "TRANSLATE.EDITORIAL_SOURCE_URLS",
           "value": ""
         },
         {
           "id": "curatedTagSeeds",
-          "element": "text",
+          "element": "input",
+          "type": "text",
           "label": "TRANSLATE.CURATED_TAG_SEEDS",
           "value": ""
         },
         {
           "id": "blockedTagPatterns",
-          "element": "text",
+          "element": "input",
+          "type": "text",
           "label": "TRANSLATE.BLOCKED_TAG_PATTERNS",
           "value": ""
         },
         {
           "id": "blockedNamePatterns",
-          "element": "text",
+          "element": "input",
+          "type": "text",
           "label": "TRANSLATE.BLOCKED_NAME_PATTERNS",
           "value": ""
         },
         {
           "id": "discoveryCloudTermLimit",
-          "element": "text",
+          "element": "input",
+          "type": "number",
           "label": "TRANSLATE.DISCOVERY_CLOUD_TERM_LIMIT",
           "value": "40"
         },
@@ -137,25 +149,29 @@
         },
         {
           "id": "discoveryAiApiBase",
-          "element": "text",
+          "element": "input",
+          "type": "text",
           "label": "TRANSLATE.DISCOVERY_AI_API_BASE",
           "value": "https://api.openai.com/v1"
         },
         {
           "id": "discoveryAiModel",
-          "element": "text",
+          "element": "input",
+          "type": "text",
           "label": "TRANSLATE.DISCOVERY_AI_MODEL",
           "value": "gpt-4o-mini"
         },
         {
           "id": "discoveryAiApiKey",
-          "element": "text",
+          "element": "input",
+          "type": "text",
           "label": "TRANSLATE.DISCOVERY_AI_API_KEY",
           "value": ""
         },
         {
           "id": "discoveryAiTermLimit",
-          "element": "text",
+          "element": "input",
+          "type": "number",
           "label": "TRANSLATE.DISCOVERY_AI_TERM_LIMIT",
           "value": "12"
         }
@@ -169,19 +185,31 @@
       "content": [
         {
           "id": "lastSyncSummary",
-          "element": "text",
+          "element": "input",
+          "type": "text",
+          "attributes": [
+            "disabled"
+          ],
           "label": "TRANSLATE.LAST_SYNC_SUMMARY",
           "value": ""
         },
         {
           "id": "lastCrawledAt",
-          "element": "text",
+          "element": "input",
+          "type": "text",
+          "attributes": [
+            "disabled"
+          ],
           "label": "TRANSLATE.LAST_CRAWLED_AT",
           "value": ""
         },
         {
           "id": "lastCheckedAt",
-          "element": "text",
+          "element": "input",
+          "type": "text",
+          "attributes": [
+            "disabled"
+          ],
           "label": "TRANSLATE.LAST_CHECKED_AT",
           "value": ""
         },

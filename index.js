@@ -487,11 +487,17 @@ ControllerCuratedRadio.prototype.getI18nString = function(key) {
 ControllerCuratedRadio.prototype._runWorkerJson = function(args) {
   const defer = libQ.defer();
   const fullArgs = [path.join(__dirname, 'scripts', 'radio_worker.py')].concat(args);
-  const options = { maxBuffer: 8 * 1024 * 1024 };
+  const options = {
+    maxBuffer: 8 * 1024 * 1024,
+    timeout: 6 * 60 * 1000
+  };
 
   execFile(this._getPythonCommand(), fullArgs, options, (error, stdout, stderr) => {
     if (error) {
-      const detail = stderr ? stderr.trim() : error.message;
+      let detail = stderr ? stderr.trim() : '';
+      if (!detail) {
+        detail = error.killed ? 'worker timeout after ' + Math.round(options.timeout / 1000) + 's' : error.message;
+      }
       this.logger.error('[curated_radio] worker failed: ' + detail);
       defer.reject(new Error(detail || 'worker error'));
       return;

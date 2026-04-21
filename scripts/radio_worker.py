@@ -55,6 +55,12 @@ TERM_STOPWORDS = {
     'mix', 'show', 'shows', 'dj', 'djs', 'podcast', 'episode'
 }
 
+# Discovery guardrails to prevent long-running crawls on slow or failing networks.
+MAX_TAG_QUERY_COUNT = 12
+MAX_TERM_QUERY_COUNT = 20
+MAX_CANDIDATE_EVALUATIONS = 120
+MAX_HOMEPAGE_FETCHES = 40
+
 
 def utc_now():
     return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace('+00:00', 'Z')
@@ -1178,7 +1184,8 @@ def build_discovery_urls(api_base, limit, tag_seeds):
     request_limit = max(25, min(int(limit), 100))
     base = api_base.rstrip('/')
     urls = []
-    for tag in tag_seeds:
+    query_cap = max(6, min(int_value(limit, 80) // 2, MAX_TAG_QUERY_COUNT))
+    for tag in (tag_seeds or [])[:query_cap]:
         encoded_tag = urllib.parse.quote(tag)
         urls.append('{}/json/stations/bytag/{}?hidebroken=true&order=votes&reverse=true&limit={}'.format(base, encoded_tag, request_limit))
     return urls
@@ -1188,7 +1195,8 @@ def build_term_search_urls(api_base, limit, terms):
     request_limit = max(25, min(int_value(limit, 80), 120))
     base = api_base.rstrip('/')
     urls = []
-    for term in terms or []:
+    query_cap = max(8, min(int_value(limit, 80), MAX_TERM_QUERY_COUNT))
+    for term in (terms or [])[:query_cap]:
         encoded = urllib.parse.quote(term)
         urls.append('{}/json/stations/search?name={}&hidebroken=true&order=clickcount&reverse=true&limit={}'.format(base, encoded, request_limit))
     return urls
@@ -1360,14 +1368,28 @@ def discover_stations(conn, output_path, api_base, limit, profile_prompt, editor
     candidates.sort(key=lambda item: (-item['_score'], -int_value(item.get('bitrate'), 0), item['name'].lower()))
     selected = []
     max_items = max(1, int(limit))
+    max_candidate_checks = max(20, min(max_items * 4, MAX_CANDIDATE_EVALUATIONS))
+    max_homepage_checks = max(8, min(max_items, MAX_HOMEPAGE_FETCHES))
+    homepage_fetch_count = 0
+    homepage_cache = {}
+    checked_candidates = 0
     for item in candidates:
+        checked_candidates += 1
+        if checked_candidates > max_candidate_checks:
+            break
         homepage_ev = None
         editorial_ev = None
-        if item.get('_homepage'):
-            try:
-                homepage_ev = homepage_curation_evidence(item['_homepage'], item['name'])
-            except Exception:
-                homepage_ev = None
+        homepage_url = item.get('_homepage')
+        if homepage_url:
+            if homepage_url in homepage_cache:
+                homepage_ev = homepage_cache[homepage_url]
+            elif homepage_fetch_count < max_homepage_checks:
+                try:
+                    homepage_ev = homepage_curation_evidence(homepage_url, item['name'])
+                except Exception:
+                    homepage_ev = None
+                homepage_cache[homepage_url] = homepage_ev
+                homepage_fetch_count += 1
         if editorial_docs:
             try:
                 editorial_ev = editorial_mention_evidence(editorial_docs, item['name'], profile)

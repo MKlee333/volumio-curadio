@@ -5,6 +5,19 @@ const fs = require('fs');
 const path = require('path');
 const execFile = require('child_process').execFile;
 
+const MIN_REFRESH_INTERVAL_MINUTES = 60;
+const MAX_REFRESH_INTERVAL_MINUTES = 10080;
+const DEFAULT_REFRESH_INTERVAL_MINUTES = 4320;
+const MIN_DISCOVERY_LIMIT = 10;
+const MAX_DISCOVERY_LIMIT = 120;
+const DEFAULT_DISCOVERY_LIMIT = 30;
+const MIN_DISCOVERY_CLOUD_TERM_LIMIT = 10;
+const MAX_DISCOVERY_CLOUD_TERM_LIMIT = 80;
+const DEFAULT_DISCOVERY_CLOUD_TERM_LIMIT = 40;
+const MIN_DISCOVERY_AI_TERM_LIMIT = 0;
+const MAX_DISCOVERY_AI_TERM_LIMIT = 12;
+const DEFAULT_DISCOVERY_AI_TERM_LIMIT = 4;
+
 module.exports = ControllerCuratedRadio;
 
 function ControllerCuratedRadio(context) {
@@ -81,20 +94,20 @@ ControllerCuratedRadio.prototype.getUIConfig = function() {
     this._setUIValue(uiconf, 'findingsJsonPath', this._configText('findingsJsonPath', '/data/INTERNAL/curated-radio-findings.json'));
     this._setUIValue(uiconf, 'autoRefresh', this._configBool('autoRefresh', true));
     this._setUIValue(uiconf, 'autoDiscover', this._configBool('autoDiscover', true));
-    this._setUIValue(uiconf, 'refreshIntervalMinutes', String(this._configInt('refreshIntervalMinutes', 360)));
+    this._setUIValue(uiconf, 'refreshIntervalMinutes', this._getRefreshIntervalMinutes());
     this._setUIValue(uiconf, 'discoveryApiBase', this._configText('discoveryApiBase', 'https://de1.api.radio-browser.info'));
-    this._setUIValue(uiconf, 'discoveryLimit', String(this._configInt('discoveryLimit', 80)));
+    this._setUIValue(uiconf, 'discoveryLimit', this._getDiscoveryLimit());
     this._setUIValue(uiconf, 'discoveryProfilePrompt', this._configText('discoveryProfilePrompt', ''));
     this._setUIValue(uiconf, 'editorialSourceUrls', this._configText('editorialSourceUrls', ''));
     this._setUIValue(uiconf, 'curatedTagSeeds', this._configText('curatedTagSeeds', ''));
     this._setUIValue(uiconf, 'blockedTagPatterns', this._configText('blockedTagPatterns', ''));
     this._setUIValue(uiconf, 'blockedNamePatterns', this._configText('blockedNamePatterns', ''));
-    this._setUIValue(uiconf, 'discoveryCloudTermLimit', String(this._configInt('discoveryCloudTermLimit', 40)));
+    this._setUIValue(uiconf, 'discoveryCloudTermLimit', this._getDiscoveryCloudTermLimit());
     this._setUIValue(uiconf, 'discoveryAiEnabled', this._configBool('discoveryAiEnabled', false));
     this._setUIValue(uiconf, 'discoveryAiApiBase', this._configText('discoveryAiApiBase', 'https://api.openai.com/v1'));
     this._setUIValue(uiconf, 'discoveryAiModel', this._configText('discoveryAiModel', 'gpt-4o-mini'));
     this._setUIValue(uiconf, 'discoveryAiApiKey', this._configText('discoveryAiApiKey', ''));
-    this._setUIValue(uiconf, 'discoveryAiTermLimit', String(this._configInt('discoveryAiTermLimit', 12)));
+    this._setUIValue(uiconf, 'discoveryAiTermLimit', this._getDiscoveryAiTermLimit());
     this._setUIValue(uiconf, 'lastSyncSummary', this._configText('lastSyncSummary', ''));
     this._setUIValue(uiconf, 'lastCrawledAt', this._formatUiTimestamp(this._configText('lastCrawledAt', '')));
     this._setUIValue(uiconf, 'lastCheckedAt', this._formatUiTimestamp(this._configText('lastCheckedAt', '')));
@@ -111,20 +124,20 @@ ControllerCuratedRadio.prototype.saveBasicConfig = function(data) {
   this.config.set('findingsJsonPath', this._textInput(data.findingsJsonPath) || '/data/INTERNAL/curated-radio-findings.json');
   this.config.set('autoRefresh', this._boolInput(data.autoRefresh, true));
   this.config.set('autoDiscover', this._boolInput(data.autoDiscover, true));
-  this.config.set('refreshIntervalMinutes', this._clampInt(data.refreshIntervalMinutes, 10, 10080, 360));
+  this.config.set('refreshIntervalMinutes', this._clampInt(data.refreshIntervalMinutes, MIN_REFRESH_INTERVAL_MINUTES, MAX_REFRESH_INTERVAL_MINUTES, DEFAULT_REFRESH_INTERVAL_MINUTES));
   this.config.set('discoveryApiBase', this._textInput(data.discoveryApiBase) || 'https://de1.api.radio-browser.info');
-  this.config.set('discoveryLimit', this._clampInt(data.discoveryLimit, 10, 500, 80));
+  this.config.set('discoveryLimit', this._clampInt(data.discoveryLimit, MIN_DISCOVERY_LIMIT, MAX_DISCOVERY_LIMIT, DEFAULT_DISCOVERY_LIMIT));
   this.config.set('discoveryProfilePrompt', this._textInput(data.discoveryProfilePrompt) || 'prefer: community radio, underground, eclectic, freeform, resident djs, mixes, archives, cultural talk, local scenes; avoid: mainstream, hits, christmas, xmas, chart, commercial, easy listening; sources: radio browser, station homepage');
   this.config.set('editorialSourceUrls', this._textInput(data.editorialSourceUrls));
   this.config.set('curatedTagSeeds', this._textInput(data.curatedTagSeeds) || 'underground,eclectic,electronic,experimental,leftfield,ambient,downtempo,house,techno,dub,dubstep,jungle,garage,lofi,hip hop,jazz,soul,reggae,community');
   this.config.set('blockedTagPatterns', this._textInput(data.blockedTagPatterns) || 'christmas,xmas,pop,hits,charts,top 40,oldies,schlager,country,religious,talk,news,sports');
   this.config.set('blockedNamePatterns', this._textInput(data.blockedNamePatterns) || 'radio paradise,mango,christmas,xmas');
-  this.config.set('discoveryCloudTermLimit', this._clampInt(data.discoveryCloudTermLimit, 10, 160, 40));
+  this.config.set('discoveryCloudTermLimit', this._clampInt(data.discoveryCloudTermLimit, MIN_DISCOVERY_CLOUD_TERM_LIMIT, MAX_DISCOVERY_CLOUD_TERM_LIMIT, DEFAULT_DISCOVERY_CLOUD_TERM_LIMIT));
   this.config.set('discoveryAiEnabled', this._boolInput(data.discoveryAiEnabled, false));
   this.config.set('discoveryAiApiBase', this._textInput(data.discoveryAiApiBase) || 'https://api.openai.com/v1');
   this.config.set('discoveryAiModel', this._textInput(data.discoveryAiModel) || 'gpt-4o-mini');
   this.config.set('discoveryAiApiKey', this._textInput(data.discoveryAiApiKey));
-  this.config.set('discoveryAiTermLimit', this._clampInt(data.discoveryAiTermLimit, 0, 40, 12));
+  this.config.set('discoveryAiTermLimit', this._clampInt(data.discoveryAiTermLimit, MIN_DISCOVERY_AI_TERM_LIMIT, MAX_DISCOVERY_AI_TERM_LIMIT, DEFAULT_DISCOVERY_AI_TERM_LIMIT));
   this._scheduleRefreshTimer();
   this.commandRouter.pushToastMessage('success', this.getI18nString('PLUGIN_NAME'), this.getI18nString('SETTINGS_SAVED'));
   return this.syncDatabase(false);
@@ -730,7 +743,7 @@ ControllerCuratedRadio.prototype._scheduleRefreshTimer = function() {
   if (!this._isEnabled() || (!this._configBool('autoRefresh', true) && !this._configBool('autoDiscover', true))) {
     return;
   }
-  const intervalMinutes = this._clampInt(this._configValue('refreshIntervalMinutes', 360), 10, 10080, 360);
+  const intervalMinutes = this._getRefreshIntervalMinutes();
   this.refreshTimer = setInterval(() => {
     this._runMaintenanceCycle(false).fail(() => libQ.resolve());
   }, intervalMinutes * 60 * 1000);
@@ -816,20 +829,20 @@ ControllerCuratedRadio.prototype._defaultConfigValues = function() {
     findingsJsonPath: '/data/INTERNAL/curated-radio-findings.json',
     autoRefresh: true,
     autoDiscover: true,
-    refreshIntervalMinutes: 360,
+    refreshIntervalMinutes: DEFAULT_REFRESH_INTERVAL_MINUTES,
     discoveryApiBase: 'https://de1.api.radio-browser.info',
-    discoveryLimit: 80,
+    discoveryLimit: DEFAULT_DISCOVERY_LIMIT,
     discoveryProfilePrompt: 'prefer: community radio, underground, eclectic, freeform, resident djs, mixes, archives, cultural talk, local scenes; avoid: mainstream, hits, christmas, xmas, chart, commercial, easy listening; sources: radio browser, station homepage',
     editorialSourceUrls: '',
     curatedTagSeeds: 'underground,eclectic,electronic,experimental,leftfield,ambient,downtempo,house,techno,dub,dubstep,jungle,garage,lofi,hip hop,jazz,soul,reggae,community',
     blockedTagPatterns: 'christmas,xmas,pop,hits,charts,top 40,oldies,schlager,country,religious,talk,news,sports',
     blockedNamePatterns: 'radio paradise,mango,christmas,xmas',
-    discoveryCloudTermLimit: 40,
+    discoveryCloudTermLimit: DEFAULT_DISCOVERY_CLOUD_TERM_LIMIT,
     discoveryAiEnabled: false,
     discoveryAiApiBase: 'https://api.openai.com/v1',
     discoveryAiModel: 'gpt-4o-mini',
     discoveryAiApiKey: '',
-    discoveryAiTermLimit: 12,
+    discoveryAiTermLimit: DEFAULT_DISCOVERY_AI_TERM_LIMIT,
     refreshOnStartup: true,
     maxStationsPerSection: 250,
     lastSyncSummary: 'Not synced yet',
@@ -986,6 +999,10 @@ ControllerCuratedRadio.prototype._getMaxStationsPerSection = function() {
   return this._clampInt(this._configValue('maxStationsPerSection', 250), 10, 1000, 250);
 };
 
+ControllerCuratedRadio.prototype._getRefreshIntervalMinutes = function() {
+  return this._clampInt(this._configValue('refreshIntervalMinutes', DEFAULT_REFRESH_INTERVAL_MINUTES), MIN_REFRESH_INTERVAL_MINUTES, MAX_REFRESH_INTERVAL_MINUTES, DEFAULT_REFRESH_INTERVAL_MINUTES);
+};
+
 ControllerCuratedRadio.prototype._getPythonCommand = function() {
   return this._configText('pythonCommand', 'python3');
 };
@@ -995,7 +1012,7 @@ ControllerCuratedRadio.prototype._getDiscoveryApiBase = function() {
 };
 
 ControllerCuratedRadio.prototype._getDiscoveryLimit = function() {
-  return this._clampInt(this._configValue('discoveryLimit', 80), 10, 500, 80);
+  return this._clampInt(this._configValue('discoveryLimit', DEFAULT_DISCOVERY_LIMIT), MIN_DISCOVERY_LIMIT, MAX_DISCOVERY_LIMIT, DEFAULT_DISCOVERY_LIMIT);
 };
 
 ControllerCuratedRadio.prototype._getDiscoveryProfilePrompt = function() {
@@ -1019,7 +1036,7 @@ ControllerCuratedRadio.prototype._getBlockedNamePatterns = function() {
 };
 
 ControllerCuratedRadio.prototype._getDiscoveryCloudTermLimit = function() {
-  return this._clampInt(this._configValue('discoveryCloudTermLimit', 40), 10, 160, 40);
+  return this._clampInt(this._configValue('discoveryCloudTermLimit', DEFAULT_DISCOVERY_CLOUD_TERM_LIMIT), MIN_DISCOVERY_CLOUD_TERM_LIMIT, MAX_DISCOVERY_CLOUD_TERM_LIMIT, DEFAULT_DISCOVERY_CLOUD_TERM_LIMIT);
 };
 
 ControllerCuratedRadio.prototype._getDiscoveryAiApiBase = function() {
@@ -1035,5 +1052,5 @@ ControllerCuratedRadio.prototype._getDiscoveryAiApiKey = function() {
 };
 
 ControllerCuratedRadio.prototype._getDiscoveryAiTermLimit = function() {
-  return this._clampInt(this._configValue('discoveryAiTermLimit', 12), 0, 40, 12);
+  return this._clampInt(this._configValue('discoveryAiTermLimit', DEFAULT_DISCOVERY_AI_TERM_LIMIT), MIN_DISCOVERY_AI_TERM_LIMIT, MAX_DISCOVERY_AI_TERM_LIMIT, DEFAULT_DISCOVERY_AI_TERM_LIMIT);
 };

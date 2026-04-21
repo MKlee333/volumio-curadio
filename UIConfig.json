@@ -90,7 +90,7 @@
           "type": "number",
           "label": "TRANSLATE.REFRESH_INTERVAL_MINUTES",
           "doc": "TRANSLATE.DOC_REFRESH_INTERVAL_MINUTES",
-          "value": "360"
+          "value": 4320
         },
         {
           "id": "discoveryApiBase",
@@ -106,7 +106,7 @@
           "type": "number",
           "label": "TRANSLATE.DISCOVERY_LIMIT",
           "doc": "TRANSLATE.DOC_DISCOVERY_LIMIT",
-          "value": "80"
+          "value": 30
         },
         {
           "id": "discoveryProfilePrompt",
@@ -154,7 +154,7 @@
           "type": "number",
           "label": "TRANSLATE.DISCOVERY_CLOUD_TERM_LIMIT",
           "doc": "TRANSLATE.DOC_DISCOVERY_CLOUD_TERM_LIMIT",
-          "value": "40"
+          "value": 40
         },
         {
           "id": "discoveryAiEnabled",
@@ -193,7 +193,7 @@
           "type": "number",
           "label": "TRANSLATE.DISCOVERY_AI_TERM_LIMIT",
           "doc": "TRANSLATE.DOC_DISCOVERY_AI_TERM_LIMIT",
-          "value": "12"
+          "value": 4
         }
       ]
     },

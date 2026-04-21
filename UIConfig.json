@@ -110,40 +110,35 @@
         },
         {
           "id": "discoveryProfilePrompt",
-          "element": "input",
-          "type": "text",
+          "element": "textarea",
           "label": "TRANSLATE.DISCOVERY_PROFILE_PROMPT",
           "doc": "TRANSLATE.DOC_DISCOVERY_PROFILE_PROMPT",
           "value": ""
         },
         {
           "id": "editorialSourceUrls",
-          "element": "input",
-          "type": "text",
+          "element": "textarea",
           "label": "TRANSLATE.EDITORIAL_SOURCE_URLS",
           "doc": "TRANSLATE.DOC_EDITORIAL_SOURCE_URLS",
           "value": ""
         },
         {
           "id": "curatedTagSeeds",
-          "element": "input",
-          "type": "text",
+          "element": "textarea",
           "label": "TRANSLATE.CURATED_TAG_SEEDS",
           "doc": "TRANSLATE.DOC_CURATED_TAG_SEEDS",
           "value": ""
         },
         {
           "id": "blockedTagPatterns",
-          "element": "input",
-          "type": "text",
+          "element": "textarea",
           "label": "TRANSLATE.BLOCKED_TAG_PATTERNS",
           "doc": "TRANSLATE.DOC_BLOCKED_TAG_PATTERNS",
           "value": ""
         },
         {
           "id": "blockedNamePatterns",
-          "element": "input",
-          "type": "text",
+          "element": "textarea",
           "label": "TRANSLATE.BLOCKED_NAME_PATTERNS",
           "doc": "TRANSLATE.DOC_BLOCKED_NAME_PATTERNS",
           "value": ""
@@ -182,9 +177,20 @@
         {
           "id": "discoveryAiApiKey",
           "element": "input",
-          "type": "text",
+          "type": "password",
           "label": "TRANSLATE.DISCOVERY_AI_API_KEY",
           "doc": "TRANSLATE.DOC_DISCOVERY_AI_API_KEY",
+          "value": ""
+        },
+        {
+          "id": "discoveryAiApiKeyStatus",
+          "element": "input",
+          "type": "text",
+          "attributes": [
+            "disabled"
+          ],
+          "label": "TRANSLATE.DISCOVERY_AI_API_KEY_STATUS",
+          "doc": "TRANSLATE.DOC_DISCOVERY_AI_API_KEY_STATUS",
           "value": ""
         },
         {

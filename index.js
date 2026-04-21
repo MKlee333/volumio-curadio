@@ -17,6 +17,21 @@ const DEFAULT_DISCOVERY_CLOUD_TERM_LIMIT = 40;
 const MIN_DISCOVERY_AI_TERM_LIMIT = 0;
 const MAX_DISCOVERY_AI_TERM_LIMIT = 12;
 const DEFAULT_DISCOVERY_AI_TERM_LIMIT = 4;
+const MAX_PATH_LENGTH = 512;
+const MAX_API_BASE_LENGTH = 256;
+const MAX_MODEL_NAME_LENGTH = 80;
+const MAX_PROFILE_PROMPT_LENGTH = 2400;
+const MAX_EDITORIAL_SOURCES_TEXT_LENGTH = 4096;
+const MAX_TAG_SEEDS_TEXT_LENGTH = 4096;
+const MAX_BLOCKED_TAGS_TEXT_LENGTH = 2048;
+const MAX_BLOCKED_NAMES_TEXT_LENGTH = 2048;
+const MAX_EDITORIAL_SOURCE_COUNT = 30;
+const MAX_TAG_SEED_COUNT = 120;
+const MAX_BLOCKED_TAG_COUNT = 120;
+const MAX_BLOCKED_NAME_COUNT = 120;
+const MAX_EDITORIAL_SOURCE_ITEM_LENGTH = 240;
+const MAX_TERM_ITEM_LENGTH = 80;
+const MAX_AI_API_KEY_LENGTH = 512;
 
 module.exports = ControllerCuratedRadio;
 
@@ -89,24 +104,25 @@ ControllerCuratedRadio.prototype.getUIConfig = function() {
     path.join(__dirname, 'UIConfig.json')
   ).then((uiconf) => {
     this._setUIValue(uiconf, 'enabled', this._configBool('enabled', true));
-    this._setUIValue(uiconf, 'databasePath', this._configText('databasePath', '/data/INTERNAL/curated-radio.db'));
-    this._setUIValue(uiconf, 'seedJsonPath', this._configText('seedJsonPath', '/data/favourites/my-web-radio'));
-    this._setUIValue(uiconf, 'findingsJsonPath', this._configText('findingsJsonPath', '/data/INTERNAL/curated-radio-findings.json'));
+    this._setUIValue(uiconf, 'databasePath', this._getDatabasePath());
+    this._setUIValue(uiconf, 'seedJsonPath', this._getSeedJsonPath());
+    this._setUIValue(uiconf, 'findingsJsonPath', this._getFindingsJsonPath());
     this._setUIValue(uiconf, 'autoRefresh', this._configBool('autoRefresh', true));
     this._setUIValue(uiconf, 'autoDiscover', this._configBool('autoDiscover', true));
     this._setUIValue(uiconf, 'refreshIntervalMinutes', this._getRefreshIntervalMinutes());
-    this._setUIValue(uiconf, 'discoveryApiBase', this._configText('discoveryApiBase', 'https://de1.api.radio-browser.info'));
+    this._setUIValue(uiconf, 'discoveryApiBase', this._getDiscoveryApiBase());
     this._setUIValue(uiconf, 'discoveryLimit', this._getDiscoveryLimit());
-    this._setUIValue(uiconf, 'discoveryProfilePrompt', this._configText('discoveryProfilePrompt', ''));
-    this._setUIValue(uiconf, 'editorialSourceUrls', this._configText('editorialSourceUrls', ''));
-    this._setUIValue(uiconf, 'curatedTagSeeds', this._configText('curatedTagSeeds', ''));
-    this._setUIValue(uiconf, 'blockedTagPatterns', this._configText('blockedTagPatterns', ''));
-    this._setUIValue(uiconf, 'blockedNamePatterns', this._configText('blockedNamePatterns', ''));
+    this._setUIValue(uiconf, 'discoveryProfilePrompt', this._formatPromptForUi(this._getDiscoveryProfilePrompt()));
+    this._setUIValue(uiconf, 'editorialSourceUrls', this._listToMultiline(this._getEditorialSourceUrls()));
+    this._setUIValue(uiconf, 'curatedTagSeeds', this._listToMultiline(this._getCuratedTagSeeds()));
+    this._setUIValue(uiconf, 'blockedTagPatterns', this._listToMultiline(this._getBlockedTagPatterns()));
+    this._setUIValue(uiconf, 'blockedNamePatterns', this._listToMultiline(this._getBlockedNamePatterns()));
     this._setUIValue(uiconf, 'discoveryCloudTermLimit', this._getDiscoveryCloudTermLimit());
     this._setUIValue(uiconf, 'discoveryAiEnabled', this._configBool('discoveryAiEnabled', false));
-    this._setUIValue(uiconf, 'discoveryAiApiBase', this._configText('discoveryAiApiBase', 'https://api.openai.com/v1'));
-    this._setUIValue(uiconf, 'discoveryAiModel', this._configText('discoveryAiModel', 'gpt-4o-mini'));
-    this._setUIValue(uiconf, 'discoveryAiApiKey', this._configText('discoveryAiApiKey', ''));
+    this._setUIValue(uiconf, 'discoveryAiApiBase', this._getDiscoveryAiApiBase());
+    this._setUIValue(uiconf, 'discoveryAiModel', this._getDiscoveryAiModel());
+    this._setUIValue(uiconf, 'discoveryAiApiKey', '');
+    this._setUIValue(uiconf, 'discoveryAiApiKeyStatus', this._getDiscoveryAiApiKeyStatus());
     this._setUIValue(uiconf, 'discoveryAiTermLimit', this._getDiscoveryAiTermLimit());
     this._setUIValue(uiconf, 'lastSyncSummary', this._configText('lastSyncSummary', ''));
     this._setUIValue(uiconf, 'lastCrawledAt', this._formatUiTimestamp(this._configText('lastCrawledAt', '')));
@@ -119,24 +135,29 @@ ControllerCuratedRadio.prototype.getUIConfig = function() {
 
 ControllerCuratedRadio.prototype.saveBasicConfig = function(data) {
   this.config.set('enabled', this._boolInput(data.enabled, true));
-  this.config.set('databasePath', this._textInput(data.databasePath) || '/data/INTERNAL/curated-radio.db');
-  this.config.set('seedJsonPath', this._textInput(data.seedJsonPath) || '/data/favourites/my-web-radio');
-  this.config.set('findingsJsonPath', this._textInput(data.findingsJsonPath) || '/data/INTERNAL/curated-radio-findings.json');
+  this.config.set('databasePath', this._sanitizePathInput(data.databasePath, '/data/INTERNAL/curated-radio.db'));
+  this.config.set('seedJsonPath', this._sanitizePathInput(data.seedJsonPath, '/data/favourites/my-web-radio'));
+  this.config.set('findingsJsonPath', this._sanitizePathInput(data.findingsJsonPath, '/data/INTERNAL/curated-radio-findings.json'));
   this.config.set('autoRefresh', this._boolInput(data.autoRefresh, true));
   this.config.set('autoDiscover', this._boolInput(data.autoDiscover, true));
   this.config.set('refreshIntervalMinutes', this._clampInt(data.refreshIntervalMinutes, MIN_REFRESH_INTERVAL_MINUTES, MAX_REFRESH_INTERVAL_MINUTES, DEFAULT_REFRESH_INTERVAL_MINUTES));
-  this.config.set('discoveryApiBase', this._textInput(data.discoveryApiBase) || 'https://de1.api.radio-browser.info');
+  this.config.set('discoveryApiBase', this._sanitizeApiBaseInput(data.discoveryApiBase, 'https://de1.api.radio-browser.info'));
   this.config.set('discoveryLimit', this._clampInt(data.discoveryLimit, MIN_DISCOVERY_LIMIT, MAX_DISCOVERY_LIMIT, DEFAULT_DISCOVERY_LIMIT));
-  this.config.set('discoveryProfilePrompt', this._textInput(data.discoveryProfilePrompt) || 'prefer: community radio, underground, eclectic, freeform, resident djs, mixes, archives, cultural talk, local scenes; avoid: mainstream, hits, christmas, xmas, chart, commercial, easy listening; sources: radio browser, station homepage');
-  this.config.set('editorialSourceUrls', this._textInput(data.editorialSourceUrls));
-  this.config.set('curatedTagSeeds', this._textInput(data.curatedTagSeeds) || 'underground,eclectic,electronic,experimental,leftfield,ambient,downtempo,house,techno,dub,dubstep,jungle,garage,lofi,hip hop,jazz,soul,reggae,community');
-  this.config.set('blockedTagPatterns', this._textInput(data.blockedTagPatterns) || 'christmas,xmas,pop,hits,charts,top 40,oldies,schlager,country,religious,talk,news,sports');
-  this.config.set('blockedNamePatterns', this._textInput(data.blockedNamePatterns) || 'radio paradise,mango,christmas,xmas');
+  this.config.set('discoveryProfilePrompt', this._sanitizePromptInput(data.discoveryProfilePrompt, 'prefer: community radio, underground, eclectic, freeform, resident djs, mixes, archives, cultural talk, local scenes; avoid: mainstream, hits, christmas, xmas, chart, commercial, easy listening; sources: radio browser, station homepage'));
+  this.config.set('editorialSourceUrls', this._sanitizeListInput(data.editorialSourceUrls, MAX_EDITORIAL_SOURCES_TEXT_LENGTH, MAX_EDITORIAL_SOURCE_COUNT, MAX_EDITORIAL_SOURCE_ITEM_LENGTH, ''));
+  this.config.set('curatedTagSeeds', this._sanitizeListInput(data.curatedTagSeeds, MAX_TAG_SEEDS_TEXT_LENGTH, MAX_TAG_SEED_COUNT, MAX_TERM_ITEM_LENGTH, 'underground,eclectic,electronic,experimental,leftfield,ambient,downtempo,house,techno,dub,dubstep,jungle,garage,lofi,hip hop,jazz,soul,reggae,community'));
+  this.config.set('blockedTagPatterns', this._sanitizeListInput(data.blockedTagPatterns, MAX_BLOCKED_TAGS_TEXT_LENGTH, MAX_BLOCKED_TAG_COUNT, MAX_TERM_ITEM_LENGTH, 'christmas,xmas,pop,hits,charts,top 40,oldies,schlager,country,religious,talk,news,sports'));
+  this.config.set('blockedNamePatterns', this._sanitizeListInput(data.blockedNamePatterns, MAX_BLOCKED_NAMES_TEXT_LENGTH, MAX_BLOCKED_NAME_COUNT, MAX_TERM_ITEM_LENGTH, 'radio paradise,mango,christmas,xmas'));
   this.config.set('discoveryCloudTermLimit', this._clampInt(data.discoveryCloudTermLimit, MIN_DISCOVERY_CLOUD_TERM_LIMIT, MAX_DISCOVERY_CLOUD_TERM_LIMIT, DEFAULT_DISCOVERY_CLOUD_TERM_LIMIT));
   this.config.set('discoveryAiEnabled', this._boolInput(data.discoveryAiEnabled, false));
-  this.config.set('discoveryAiApiBase', this._textInput(data.discoveryAiApiBase) || 'https://api.openai.com/v1');
-  this.config.set('discoveryAiModel', this._textInput(data.discoveryAiModel) || 'gpt-4o-mini');
-  this.config.set('discoveryAiApiKey', this._textInput(data.discoveryAiApiKey));
+  this.config.set('discoveryAiApiBase', this._sanitizeApiBaseInput(data.discoveryAiApiBase, 'https://api.openai.com/v1'));
+  this.config.set('discoveryAiModel', this._sanitizePlainText(data.discoveryAiModel, 'gpt-4o-mini', MAX_MODEL_NAME_LENGTH));
+  if (Object.prototype.hasOwnProperty.call(data || {}, 'discoveryAiApiKey')) {
+    const aiKey = this._sanitizePlainText(data.discoveryAiApiKey, '', MAX_AI_API_KEY_LENGTH);
+    if (aiKey) {
+      this.config.set('discoveryAiApiKey', aiKey);
+    }
+  }
   this.config.set('discoveryAiTermLimit', this._clampInt(data.discoveryAiTermLimit, MIN_DISCOVERY_AI_TERM_LIMIT, MAX_DISCOVERY_AI_TERM_LIMIT, DEFAULT_DISCOVERY_AI_TERM_LIMIT));
   this._scheduleRefreshTimer();
   this.commandRouter.pushToastMessage('success', this.getI18nString('PLUGIN_NAME'), this.getI18nString('SETTINGS_SAVED'));
@@ -779,6 +800,109 @@ ControllerCuratedRadio.prototype._textInput = function(value) {
   return String(unwrapped == null ? '' : unwrapped).trim();
 };
 
+ControllerCuratedRadio.prototype._sanitizePlainText = function(value, fallback, maxLength) {
+  let text = this._textInput(value);
+  if (!text) {
+    return fallback || '';
+  }
+  if (typeof maxLength === 'number' && maxLength > 0 && text.length > maxLength) {
+    text = text.slice(0, maxLength).trim();
+  }
+  return text || (fallback || '');
+};
+
+ControllerCuratedRadio.prototype._sanitizePathInput = function(value, fallback) {
+  return this._sanitizePlainText(value, fallback || '', MAX_PATH_LENGTH);
+};
+
+ControllerCuratedRadio.prototype._sanitizeApiBaseInput = function(value, fallback) {
+  let text = this._sanitizePlainText(value, fallback || '', MAX_API_BASE_LENGTH);
+  if (!text) {
+    return fallback || '';
+  }
+  if (!/^https?:\/\//i.test(text)) {
+    return fallback || '';
+  }
+  text = text.replace(/\/+$/, '');
+  return text || (fallback || '');
+};
+
+ControllerCuratedRadio.prototype._sanitizePromptInput = function(value, fallback) {
+  const raw = this._unwrapInputValue(value);
+  let text = String(raw == null ? '' : raw);
+  text = text.replace(/\r\n/g, '\n').trim();
+  if (!text) {
+    text = fallback || '';
+  }
+  if (text.length > MAX_PROFILE_PROMPT_LENGTH) {
+    text = text.slice(0, MAX_PROFILE_PROMPT_LENGTH).trim();
+  }
+  return text;
+};
+
+ControllerCuratedRadio.prototype._sanitizeListInput = function(value, maxLength, maxItems, maxItemLength, fallback) {
+  const raw = this._unwrapInputValue(value);
+  let text = String(raw == null ? '' : raw);
+  text = text.replace(/\r\n/g, '\n');
+  if (!text && fallback) {
+    text = String(fallback);
+  }
+  if (typeof maxLength === 'number' && maxLength > 0 && text.length > maxLength) {
+    text = text.slice(0, maxLength);
+  }
+  const seen = new Set();
+  const items = [];
+  text.split(/[\n,;]+/).forEach((part) => {
+    let item = String(part || '').trim();
+    if (!item) {
+      return;
+    }
+    if (typeof maxItemLength === 'number' && maxItemLength > 0 && item.length > maxItemLength) {
+      item = item.slice(0, maxItemLength).trim();
+    }
+    const key = item.toLowerCase();
+    if (!item || seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    items.push(item);
+  });
+  if (typeof maxItems === 'number' && maxItems > 0 && items.length > maxItems) {
+    items.length = maxItems;
+  }
+  return items.join(',');
+};
+
+ControllerCuratedRadio.prototype._listToMultiline = function(value) {
+  return String(value || '')
+    .split(',')
+    .map((entry) => String(entry || '').trim())
+    .filter((entry) => entry.length > 0)
+    .join('\n');
+};
+
+ControllerCuratedRadio.prototype._formatPromptForUi = function(value) {
+  const text = String(value || '').trim();
+  if (!text) {
+    return '';
+  }
+  if (text.indexOf('\n') !== -1) {
+    return text;
+  }
+  return text.replace(/;\s*/g, ';\n');
+};
+
+ControllerCuratedRadio.prototype._getDiscoveryAiApiKeyStatus = function() {
+  const configKey = this._configText('discoveryAiApiKey', '');
+  if (configKey) {
+    return this.getI18nString('AI_KEY_STATUS_CONFIGURED') + ' ' + configKey.length + ')';
+  }
+  if (process.env.OPENAI_API_KEY) {
+    return this.getI18nString('AI_KEY_STATUS_ENV');
+  }
+  return this.getI18nString('AI_KEY_STATUS_NOT_SET');
+};
+
 ControllerCuratedRadio.prototype._boolInput = function(value, fallback) {
   const unwrapped = this._unwrapInputValue(value);
   if (typeof unwrapped === 'boolean') {
@@ -984,15 +1108,15 @@ ControllerCuratedRadio.prototype._isEnabled = function() {
 };
 
 ControllerCuratedRadio.prototype._getDatabasePath = function() {
-  return this._configText('databasePath', '/data/INTERNAL/curated-radio.db');
+  return this._sanitizePathInput(this._configValue('databasePath', '/data/INTERNAL/curated-radio.db'), '/data/INTERNAL/curated-radio.db');
 };
 
 ControllerCuratedRadio.prototype._getSeedJsonPath = function() {
-  return this._configText('seedJsonPath', '/data/favourites/my-web-radio');
+  return this._sanitizePathInput(this._configValue('seedJsonPath', '/data/favourites/my-web-radio'), '/data/favourites/my-web-radio');
 };
 
 ControllerCuratedRadio.prototype._getFindingsJsonPath = function() {
-  return this._configText('findingsJsonPath', '/data/INTERNAL/curated-radio-findings.json');
+  return this._sanitizePathInput(this._configValue('findingsJsonPath', '/data/INTERNAL/curated-radio-findings.json'), '/data/INTERNAL/curated-radio-findings.json');
 };
 
 ControllerCuratedRadio.prototype._getMaxStationsPerSection = function() {
@@ -1008,7 +1132,7 @@ ControllerCuratedRadio.prototype._getPythonCommand = function() {
 };
 
 ControllerCuratedRadio.prototype._getDiscoveryApiBase = function() {
-  return this._configText('discoveryApiBase', 'https://de1.api.radio-browser.info');
+  return this._sanitizeApiBaseInput(this._configValue('discoveryApiBase', 'https://de1.api.radio-browser.info'), 'https://de1.api.radio-browser.info');
 };
 
 ControllerCuratedRadio.prototype._getDiscoveryLimit = function() {
@@ -1016,23 +1140,23 @@ ControllerCuratedRadio.prototype._getDiscoveryLimit = function() {
 };
 
 ControllerCuratedRadio.prototype._getDiscoveryProfilePrompt = function() {
-  return this._configText('discoveryProfilePrompt', 'prefer: community radio, underground, eclectic, freeform, resident djs, mixes, archives, cultural talk, local scenes; avoid: mainstream, hits, christmas, xmas, chart, commercial, easy listening; sources: radio browser, station homepage');
+  return this._sanitizePromptInput(this._configValue('discoveryProfilePrompt', 'prefer: community radio, underground, eclectic, freeform, resident djs, mixes, archives, cultural talk, local scenes; avoid: mainstream, hits, christmas, xmas, chart, commercial, easy listening; sources: radio browser, station homepage'), 'prefer: community radio, underground, eclectic, freeform, resident djs, mixes, archives, cultural talk, local scenes; avoid: mainstream, hits, christmas, xmas, chart, commercial, easy listening; sources: radio browser, station homepage');
 };
 
 ControllerCuratedRadio.prototype._getEditorialSourceUrls = function() {
-  return this._configText('editorialSourceUrls', '');
+  return this._sanitizeListInput(this._configValue('editorialSourceUrls', ''), MAX_EDITORIAL_SOURCES_TEXT_LENGTH, MAX_EDITORIAL_SOURCE_COUNT, MAX_EDITORIAL_SOURCE_ITEM_LENGTH, '');
 };
 
 ControllerCuratedRadio.prototype._getCuratedTagSeeds = function() {
-  return this._configText('curatedTagSeeds', 'underground,eclectic,electronic,experimental,leftfield,ambient,downtempo,house,techno,dub,dubstep,jungle,garage,lofi,hip hop,jazz,soul,reggae,community');
+  return this._sanitizeListInput(this._configValue('curatedTagSeeds', 'underground,eclectic,electronic,experimental,leftfield,ambient,downtempo,house,techno,dub,dubstep,jungle,garage,lofi,hip hop,jazz,soul,reggae,community'), MAX_TAG_SEEDS_TEXT_LENGTH, MAX_TAG_SEED_COUNT, MAX_TERM_ITEM_LENGTH, 'underground,eclectic,electronic,experimental,leftfield,ambient,downtempo,house,techno,dub,dubstep,jungle,garage,lofi,hip hop,jazz,soul,reggae,community');
 };
 
 ControllerCuratedRadio.prototype._getBlockedTagPatterns = function() {
-  return this._configText('blockedTagPatterns', 'christmas,xmas,pop,hits,charts,top 40,oldies,schlager,country,religious,talk,news,sports');
+  return this._sanitizeListInput(this._configValue('blockedTagPatterns', 'christmas,xmas,pop,hits,charts,top 40,oldies,schlager,country,religious,talk,news,sports'), MAX_BLOCKED_TAGS_TEXT_LENGTH, MAX_BLOCKED_TAG_COUNT, MAX_TERM_ITEM_LENGTH, 'christmas,xmas,pop,hits,charts,top 40,oldies,schlager,country,religious,talk,news,sports');
 };
 
 ControllerCuratedRadio.prototype._getBlockedNamePatterns = function() {
-  return this._configText('blockedNamePatterns', 'radio paradise,mango,christmas,xmas');
+  return this._sanitizeListInput(this._configValue('blockedNamePatterns', 'radio paradise,mango,christmas,xmas'), MAX_BLOCKED_NAMES_TEXT_LENGTH, MAX_BLOCKED_NAME_COUNT, MAX_TERM_ITEM_LENGTH, 'radio paradise,mango,christmas,xmas');
 };
 
 ControllerCuratedRadio.prototype._getDiscoveryCloudTermLimit = function() {
@@ -1040,15 +1164,15 @@ ControllerCuratedRadio.prototype._getDiscoveryCloudTermLimit = function() {
 };
 
 ControllerCuratedRadio.prototype._getDiscoveryAiApiBase = function() {
-  return this._configText('discoveryAiApiBase', 'https://api.openai.com/v1');
+  return this._sanitizeApiBaseInput(this._configValue('discoveryAiApiBase', 'https://api.openai.com/v1'), 'https://api.openai.com/v1');
 };
 
 ControllerCuratedRadio.prototype._getDiscoveryAiModel = function() {
-  return this._configText('discoveryAiModel', 'gpt-4o-mini');
+  return this._sanitizePlainText(this._configValue('discoveryAiModel', 'gpt-4o-mini'), 'gpt-4o-mini', MAX_MODEL_NAME_LENGTH);
 };
 
 ControllerCuratedRadio.prototype._getDiscoveryAiApiKey = function() {
-  return this._configText('discoveryAiApiKey', '') || process.env.OPENAI_API_KEY || '';
+  return this._sanitizePlainText(this._configValue('discoveryAiApiKey', ''), '', MAX_AI_API_KEY_LENGTH) || process.env.OPENAI_API_KEY || '';
 };
 
 ControllerCuratedRadio.prototype._getDiscoveryAiTermLimit = function() {

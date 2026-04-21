@@ -1108,7 +1108,7 @@ def parse_json_object_text(value):
 def ai_expand_discovery_terms(profile_prompt, term_cloud, blocked_terms, enabled, api_base, model, api_key, ai_term_limit):
     if not parse_bool_value(enabled, False):
         return {'prefer_terms': [], 'avoid_terms': [], 'used': False, 'error': ''}
-    key_value = (api_key or '').strip()
+    key_value = (api_key or os.environ.get('CURADIO_AI_API_KEY') or '').strip()
     base_value = (api_base or '').strip().rstrip('/')
     model_value = (model or '').strip()
     if not key_value or not base_value or not model_value:

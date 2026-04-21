@@ -428,6 +428,9 @@ ControllerCuratedRadio.prototype.discoverFindings = function(showToastOnError) {
     return libQ.resolve();
   }
 
+  const aiApiKey = this._getDiscoveryAiApiKey();
+  const workerEnv = aiApiKey ? { CURADIO_AI_API_KEY: aiApiKey } : null;
+
   this.workerBusy = true;
   return this._runWorkerJson([
     'discover',
@@ -444,9 +447,8 @@ ControllerCuratedRadio.prototype.discoverFindings = function(showToastOnError) {
     '--ai-enabled', this._configBool('discoveryAiEnabled', false) ? '1' : '0',
     '--ai-api-base', this._getDiscoveryAiApiBase(),
     '--ai-model', this._getDiscoveryAiModel(),
-    '--ai-api-key', this._getDiscoveryAiApiKey(),
     '--ai-term-limit', String(this._getDiscoveryAiTermLimit())
-  ]).then((summary) => {
+  ], workerEnv).then((summary) => {
     const crawledAt = new Date().toISOString();
     this.config.set('lastCrawledAt', crawledAt);
     if (!summary || typeof summary !== 'object') {
@@ -484,12 +486,13 @@ ControllerCuratedRadio.prototype.getI18nString = function(key) {
   return key;
 };
 
-ControllerCuratedRadio.prototype._runWorkerJson = function(args) {
+ControllerCuratedRadio.prototype._runWorkerJson = function(args, envVars) {
   const defer = libQ.defer();
   const fullArgs = [path.join(__dirname, 'scripts', 'radio_worker.py')].concat(args);
   const options = {
     maxBuffer: 8 * 1024 * 1024,
-    timeout: 6 * 60 * 1000
+    timeout: 6 * 60 * 1000,
+    env: Object.assign({}, process.env, envVars || {})
   };
 
   execFile(this._getPythonCommand(), fullArgs, options, (error, stdout, stderr) => {
